@@ -26,7 +26,9 @@ describe('utils', () => {
         expect(utils.hasOwn({ a: 1 }, 'b')).toEqual(false);
         expect(utils.hasOwn({}, 'hasOwnProperty')).toEqual(false);
         expect(utils.hasOwn({ hasOwnProperty: () => true }, 'x')).toEqual(false);
-        function Obj() {} // eslint-disable-line
+        class Obj {
+            // Optionally add properties or methods if needed
+        }
         Obj.prototype.hasOwnProperty = () => true;
         expect(utils.hasOwn(new Obj(), 'x')).toEqual(false);
         expect(utils.hasOwn(['0', 'a'], 0)).toEqual(true);
@@ -41,13 +43,13 @@ describe('utils', () => {
         expect(copy === o).toEqual(false);
         copy = utils.cloneDeep([o]);
         expect(copy).toEqual([o]);
-        expect(copy === [o]).toEqual(false);
+        expect(copy).not.toBe([o]);
     });
 
     test('.each(), .eachRight()', () => {
         const a = [1, 2, 3, 4];
 
-        let out = [];
+        let out: unknown[] = [];
         utils.each(a, (value, index, list) => {
             expect(value).toEqual(a[index]);
             expect(index).toEqual(a[index] - 1);
@@ -70,6 +72,7 @@ describe('utils', () => {
         utils.each(a, (value, index) => {
             if (index <= 1) {
                 out.push(value);
+                return true;
             } else {
                 return false;
             }
@@ -80,6 +83,7 @@ describe('utils', () => {
         utils.eachRight(a, (value, index) => {
             if (index > 1) {
                 out.push(value);
+                return true;
             } else {
                 return false;
             }
@@ -89,7 +93,7 @@ describe('utils', () => {
 
     test('.eachItem()', () => {
         const c1 = [1, 'a', true, { x: [2] }, [3]];
-        let out = [];
+        let out: unknown[] = [];
         utils.eachItem(c1, (item, index, collection) => {
             out.push([index, item]);
             expect(collection).toEqual(c1);
@@ -171,7 +175,19 @@ describe('utils', () => {
 
     test('.cloneDeep()', () => {
         const now = Date.now();
-        const original = {
+        const original: {
+            str: string;
+            num: number;
+            bool: boolean;
+            date: Date;
+            regexp: RegExp;
+            arr: (number | number[] | { a: number; b: number })[];
+            obj: { x: number; y: { z: boolean } };
+            nil: null;
+            undef: undefined;
+            symbol?: symbol;
+            circular?: unknown;
+        } = {
             str: 'string',
             num: 1,
             bool: true,
@@ -188,7 +204,9 @@ describe('utils', () => {
         // symbols are unique, so won't be exact but values should match
         original.symbol = Symbol('test');
         cloned = utils.cloneDeep(original);
-        expect(original.symbol.valueOf()).toEqual(cloned.symbol.valueOf());
+        expect(original.symbol).toBeDefined();
+        expect((cloned as typeof original).symbol).toBeDefined();
+        expect(original.symbol!.valueOf()).toEqual((cloned as typeof original).symbol!.valueOf());
 
         original.circular = original;
         expect(() => utils.cloneDeep(original)).toThrow();
