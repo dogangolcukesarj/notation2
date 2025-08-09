@@ -1,3 +1,6 @@
+/* eslint-disable complexity */
+/* eslint-disable max-lines */
+/* eslint-disable @typescript-eslint/member-ordering */
 /* eslint no-use-before-define:0, consistent-return:0, max-statements:0, max-len:0 */
 
 import { utils } from '../utils.js';
@@ -52,7 +55,37 @@ const DEFAULT_OPTS = Object.freeze({
  *  @author   Onur Yıldırım <onur@cutepilot.com>
  *  @license  MIT
  */
-class Notation {
+
+/**
+ * Interface for Notation options
+ */
+interface INotationOptions {
+    preserveIndices?: boolean;
+    allowUndefined?: boolean;
+    autoCreate?: boolean;
+    autoMode?: 'branch' | 'value' | 'extend' | 'extendSafe';
+    strict?: boolean;
+}
+
+/**
+ * Interface for inspection result
+ */
+interface IInspectResult {
+    has: boolean;
+    value: unknown;
+    notation?: string;
+    parentIsArray?: boolean;
+    type?: string;
+    lastNote?: string;
+    lastNoteNormalized?: string | number;
+    level?: number;
+}
+
+export class Notation {
+    // Private properties
+    private _source: Record<string, unknown> | unknown[];
+    private _options: INotationOptions = {};
+    private _isArray: boolean;
 
     /**
      *  Initializes a new instance of `Notation`.
@@ -76,13 +109,13 @@ class Notation {
      *  notation.remove('car.model').set('car.color', 'red').value
      *  // » { car: { brand: "Dodge", year: 1970, color: "red" } }
      */
-    constructor(source, options) {
+    constructor(source: unknown = {}, options?: INotationOptions) {
         if (arguments.length === 0) {
             this._source = {};
         } else if (!utils.isCollection(source)) {
             throw new NotationError(ERR.SOURCE);
         } else {
-            this._source = source;
+            this._source = source as Record<string, unknown> | unknown[];
         }
 
         this._isArray = utils.type(this._source) === 'array';
@@ -97,11 +130,11 @@ class Notation {
      *  Gets or sets notation options.
      *  @type {Object}
      */
-    get options() {
+    get options(): INotationOptions {
         return this._options;
     }
 
-    set options(value) {
+    set options(value: INotationOptions | undefined) {
         this._options = {
             ...DEFAULT_OPTS,
             ...(this._options || {}),
@@ -123,7 +156,7 @@ class Notation {
      *  console.log(me); // { name: "Onur", age: 36, car: { brand: "Ford", model: "Mustang" } }
      *  console.log(person === me); // true
      */
-    get value() {
+    get value(): Record<string, unknown> | unknown[] {
         return this._source;
     }
 
@@ -151,8 +184,8 @@ class Notation {
      *  // "car.model"  "Charger"
      *  // "car.year"  1970
      */
-    each(callback) {
-        _each(this._source, callback);
+    each(callback: (notation: string, key: string | number, value: unknown, object: Record<string, unknown> | unknown[]) => void | boolean): Notation {
+        _each(this._source, callback as unknown as (currentNotation: string, note: string | number, value: unknown, source: Record<string, unknown> | unknown[]) => boolean | void);
         return this;
     }
 
@@ -174,12 +207,14 @@ class Notation {
      *          console.log(note, levelValue); // "car.brand" "Dodge"
      *      });
      */
-    eachValue(notation, callback) {
-        let level = this._source;
-        Notation.eachNote(notation, (levelNotation, note, index, list) => {
-            level = utils.hasOwn(level, note) ? level[note] : undefined;
-            if (callback(level, levelNotation, note, index, list) === false) return false;
-
+    eachValue(notation: string, callback: (levelValue: unknown, note: string, index: number, list: string[]) => void | boolean): Notation {
+        let level: unknown = this._source;
+        Notation.eachNote(notation, (levelNotation: string, note: string, index: number, list: string[]): void | boolean => {
+            level = utils.hasOwn(level as Record<string, unknown> | unknown[], note) ?
+                (level as Record<string | number, unknown>)[note] :
+                undefined;
+            if (callback(level, note, index, list) === false) return false;
+            return undefined;
         });
         return this;
     }
@@ -194,8 +229,8 @@ class Notation {
      *  const notations = Notation.create(obj).getNotations();
      *  console.log(notations); // [ "car.brand", "car.model", "car.year" ]
      */
-    getNotations() {
-        const list = [];
+    getNotations(): string[] {
+        const list: string[] = [];
         this.each(notation => {
             list.push(notation);
         });
@@ -231,8 +266,8 @@ class Notation {
      *  console.log('newProp' in source2); // ——» false
      *  console.log(cloned.newProp); // ——» true
      */
-    clone() {
-        this._source = utils.cloneDeep(this._source);
+    clone(): Notation {
+        this._source = utils.cloneDeep(this._source) as Record<string, unknown> | unknown[];
         return this;
     }
 
@@ -250,8 +285,8 @@ class Notation {
      *  //     "car.year": 1970
      *  // }
      */
-    flatten() {
-        const o = {};
+    flatten(): Notation {
+        const o: Record<string, unknown> = {};
         this.each((notation, key, value) => {
             o[notation] = value;
         });
@@ -274,8 +309,8 @@ class Notation {
      *  const expanded = Notation.create(obj).expand().value;
      *  console.log(expanded); // { car: { brand: "Dodge", model: "Charger", year: 1970 } };
      */
-    expand() {
-        this._source = Notation.create({}).merge(this._source).value;
+    expand(): Notation {
+        this._source = Notation.create({}).merge(this._source as Record<string, unknown>).value as Record<string, unknown>;
         return this;
     }
 
@@ -284,7 +319,7 @@ class Notation {
      *  @private
      *  @returns {Notation} -
      */
-    aggregate() {
+    aggregate(): Notation {
         return this.expand();
     }
 
@@ -305,14 +340,18 @@ class Notation {
      *  Notation.create({ car: { brands: ['Ford', 'Dodge'] } }).inspectGet("car.brands[1]");
      *  // { has: true, value: 'Dodge', lastNote: '[1]', lastNoteNormalized: 1 }
      */
-    inspectGet(notation) {
-        let level = this._source;
-        let result = { has: false, value: undefined };
+    inspectGet(notation: string): IInspectResult {
+        let level: unknown = this._source;
+        let result: IInspectResult = { has: false, value: undefined };
         let parent;
-        Notation.eachNote(notation, (levelNotation, note, index) => {
+        Notation.eachNote(notation, (levelNotation: string, note: string, index: number): void | boolean => {
             const lastNoteNormalized = utils.normalizeNote(note);
-            if (utils.hasOwn(level, lastNoteNormalized)) {
-                level = level[lastNoteNormalized];
+            if (utils.hasOwn(level as Record<string, unknown> | unknown[], lastNoteNormalized)) {
+                level = typeof lastNoteNormalized === 'number' && Array.isArray(level)
+                    ? level[lastNoteNormalized]
+                    : typeof lastNoteNormalized === 'string' && !Array.isArray(level)
+                        ? (level as Record<string, unknown>)[lastNoteNormalized]
+                        : undefined;
                 parent = level;
                 result = {
                     notation,
@@ -328,6 +367,7 @@ class Notation {
                 result = {
                     notation,
                     has: false,
+                    value: undefined,
                     type: 'undefined',
                     level: index + 1,
                     lastNote: note,
@@ -390,10 +430,12 @@ class Notation {
      *  // result » { notation: "car.colors[0]", has: true, value: "black", lastNote: "[0]", lastNoteNormalized: 0 }
      *  // obj » { car: { colors: [(empty), "white"] } }
      */
-    inspectRemove(notation) {
+    inspectRemove(notation: string): IInspectResult {
         if (!notation) throw new Error(ERR.NOTATION + `'${notation}'`);
         const parentNotation = Notation.parent(notation);
-        const parent = parentNotation ? this.get(parentNotation, null) : this._source;
+        const parent: Record<string | number, unknown> | unknown[] = parentNotation ?
+            this.get(parentNotation, null) as Record<string | number, unknown> | unknown[] :
+            this._source;
         const parentIsArray = utils.type(parent) === 'array';
         const notes = Notation.split(notation);
         const lastNote = notes[notes.length - 1];
@@ -401,7 +443,11 @@ class Notation {
 
         let result; let value;
         if (utils.hasOwn(parent, lastNoteNormalized)) {
-            value = parent[lastNoteNormalized];
+            value = typeof lastNoteNormalized === 'number' && Array.isArray(parent)
+                ? parent[lastNoteNormalized]
+                : typeof lastNoteNormalized === 'string' && !Array.isArray(parent)
+                    ? (parent as Record<string, unknown>)[lastNoteNormalized]
+                    : undefined;
             result = {
                 notation,
                 has: true,
@@ -417,14 +463,19 @@ class Notation {
             // splice the item out. otherwise, we'll use `delete` syntax to
             // empty the item.
             if (!this.options.preserveIndices && parentIsArray) {
-                parent.splice(lastNoteNormalized, 1);
+                (parent as unknown[]).splice(lastNoteNormalized as number, 1);
             } else {
-                delete parent[lastNoteNormalized];
+                if (typeof lastNoteNormalized === 'number' && Array.isArray(parent)) {
+                    delete parent[lastNoteNormalized];
+                } else if (typeof lastNoteNormalized === 'string' && !Array.isArray(parent)) {
+                    delete (parent as Record<string, unknown>)[lastNoteNormalized];
+                }
             }
         } else {
             result = {
                 notation,
                 has: false,
+                value: undefined,
                 type: 'undefined',
                 level: notes.length,
                 lastNote,
@@ -448,7 +499,7 @@ class Notation {
      *  Notation.create({ car: { year: undefined } }).has("car.year"); // true
      *  Notation.create({}).has("car.color"); // false
      */
-    has(notation) {
+    has(notation: string): boolean {
         return this.inspectGet(notation).has;
     }
 
@@ -464,7 +515,7 @@ class Notation {
      *  Notation.create({ car: { year: undefined } }).hasDefined("car.year"); // false
      *  Notation.create({}).hasDefined("car.color"); // false
      */
-    hasDefined(notation) {
+    hasDefined(notation: string): boolean {
         return this.inspectGet(notation).value !== undefined;
     }
 
@@ -492,7 +543,7 @@ class Notation {
      *  // and no default value is given.
      *  Notation.create({ car: {} }, { strict: true }).get("car.model");
      */
-    get(notation, defaultValue) {
+    get(notation: string, defaultValue?: unknown): unknown {
         const result = this.inspectGet(notation);
         // if strict and no default value is set, check if implied index or prop
         // exists
@@ -534,17 +585,21 @@ class Notation {
      *  console.log(obj);
      *  // { notebook: "Mac", car: { brand: "Ford", model: "Mustang", year: 1970, color: "red" }, boat: "none" };
      */
-    set(notation, value, mode = 'overwrite') {
+    set(notation: string, value: unknown, mode: string | boolean = 'overwrite'): Notation {
         if (!notation.trim()) throw new NotationError(ERR.NOTATION + `'${notation}'`);
         if (mode === true) mode = 'overwrite';
         let level = this._source;
-        let currentIsLast; let nCurrentNote; let nNextNote; let nextIsArrayNote; let type;
+        let currentIsLast: boolean;
+        let nCurrentNote: string | number;
+        let nNextNote: string | number;
+        let nextIsArrayNote: boolean;
+        let type: string;
         const insertErrMsg = 'Cannot set value by inserting at index, on an object';
 
         Notation.eachNote(notation, (levelNotation, note, index, list) => {
             currentIsLast = index === list.length - 1;
             nCurrentNote = nNextNote || utils.normalizeNote(note);
-            nNextNote = currentIsLast ? null : utils.normalizeNote(list[index + 1]);
+            nNextNote = currentIsLast ? 0 : utils.normalizeNote(list[index + 1]);
             type = utils.type(level);
 
             if (type === 'array' && typeof nCurrentNote !== 'number') {
@@ -558,10 +613,16 @@ class Notation {
                 if (currentIsLast) {
                     // if mode is "overwrite", assign the value.
                     if (mode === 'overwrite') {
-                        level[nCurrentNote] = value;
+                        if (typeof nCurrentNote === 'number' && Array.isArray(level)) {
+                            level[nCurrentNote] = value;
+                        } else if (typeof nCurrentNote === 'string' && !Array.isArray(level)) {
+                            (level as Record<string, unknown>)[nCurrentNote] = value;
+                        } else {
+                            throw new NotationError(`Cannot set ${typeof nCurrentNote} key on ${Array.isArray(level) ? 'array' : 'object'}`);
+                        }
                     } else if (mode === 'insert') {
-                        if (type === 'array') {
-                            level.splice(nCurrentNote, 0, value);
+                        if (type === 'array' && typeof nCurrentNote === 'number') {
+                            (level as unknown[]).splice(nCurrentNote, 0, value);
                         } else {
                             throw new NotationError(insertErrMsg);
                         }
@@ -569,7 +630,13 @@ class Notation {
                     // otherwise, will not overwrite
                 } else {
                     // if not last level; just re-reference the current level.
-                    level = level[nCurrentNote];
+                    if (typeof nCurrentNote === 'number' && Array.isArray(level)) {
+                        level = level[nCurrentNote] as Record<string, unknown> | unknown[];
+                    } else if (typeof nCurrentNote === 'string' && !Array.isArray(level)) {
+                        level = (level as Record<string, unknown>)[nCurrentNote] as Record<string, unknown> | unknown[];
+                    } else {
+                        throw new NotationError(`Cannot get ${typeof nCurrentNote} key from ${Array.isArray(level) ? 'array' : 'object'}`);
+                    }
                 }
             } else {
                 if (currentIsLast && type !== 'array' && mode === 'insert') {
@@ -583,8 +650,15 @@ class Notation {
                 // we don't have this property at this level so; if this is the
                 // last level, we set the value if not, we set an empty
                 // collection for the next level
-                level[nCurrentNote] = (currentIsLast ? value : (nextIsArrayNote ? [] : {}));
-                level = level[nCurrentNote];
+                if (typeof nCurrentNote === 'number' && Array.isArray(level)) {
+                    level[nCurrentNote] = (currentIsLast ? value : (nextIsArrayNote ? [] : {}));
+                    level = level[nCurrentNote] as Record<string, unknown> | unknown[];
+                } else if (typeof nCurrentNote === 'string' && !Array.isArray(level)) {
+                    (level as Record<string, unknown>)[nCurrentNote] = (currentIsLast ? value : (nextIsArrayNote ? [] : {}));
+                    level = (level as Record<string, unknown>)[nCurrentNote] as Record<string, unknown> | unknown[];
+                } else {
+                    throw new NotationError(`Cannot set ${typeof nCurrentNote} key on ${Array.isArray(level) ? 'array' : 'object'}`);
+                }
             }
         });
         return this;
@@ -620,12 +694,13 @@ class Notation {
      *  console.log(obj);
      *  // { car: { brand: "Ford", model: "Mustang", year: 1970, color: "red" }, boat: "none" };
      */
-    merge(notationsObject, overwrite = true) {
+    merge(notationsObject: Record<string, unknown>, overwrite: boolean = true): Notation {
         if (utils.type(notationsObject) !== 'object') {
             throw new NotationError(ERR.NOTA_OBJ + 'Expected an object.');
         }
-        let value;
-        utils.each(Object.keys(notationsObject), notation => {
+        let value: unknown;
+        utils.each(Object.keys(notationsObject) as unknown[], (item: unknown) => {
+            const notation = item as string;
             value = notationsObject[notation];
             this.set(notation, value, overwrite);
         });
@@ -649,14 +724,14 @@ class Notation {
      *  console.log(obj);
      *  // { car: { year: 1970 } };
      */
-    separate(notations) {
+    separate(notations: string[]): Notation {
         if (utils.type(notations) !== 'array') {
             throw new NotationError(ERR.NOTA_OBJ + 'Expected an array.');
         }
         const o = new Notation({});
-        utils.each(notations, notation => {
-            const result = this.inspectRemove(notation);
-            o.set(notation, result.value);
+        utils.each(notations as unknown[], (notation: unknown) => {
+            const result = this.inspectRemove(notation as string);
+            o.set(notation as string, result.value);
         });
         this._source = o._source;
         return this;
@@ -698,13 +773,14 @@ class Notation {
      *  console.log(car);                                     // { brand: "Ford", model: { name: "Mustang", year: 1970 } }
      *  console.log(n.filter().value);                        // {} // —» equivalent to n.filter("") or n.filter("!*")
      */
-    filter(globList, options = {}) {
+    filter(globList: string | string[] | undefined, options: { restrictive?: boolean } = {}): Notation {
         const { re } = utils;
 
         // ensure array, normalize and sort the globs in logical order. this
         // also concats the array first (to prevent mutating the original
         // array).
-        const globs = Glob.normalize(globList, options.restrictive);
+        const normalizedGlobList = globList ? (Array.isArray(globList) ? globList : [globList]) : [];
+        const globs = Glob.normalize(normalizedGlobList, options.restrictive);
         const len = globs.length;
         const empty = this._isArray ? [] : {};
 
@@ -714,7 +790,7 @@ class Notation {
             return this;
         }
 
-        const cloned = utils.cloneDeep(this.value);
+        const cloned = utils.cloneDeep(this.value) as Record<string, unknown> | unknown[];
 
         const firstIsWildcard = re.WILDCARD.test(globs[0]);
         // if globs only consist of "*" or "[*]"; set the "clone" as source and
@@ -738,11 +814,15 @@ class Notation {
         }
 
         // iterate through globs
-        utils.each(globs, globNotation => {
+        utils.each(globs as unknown[], (_item: unknown, _index: number, _array: unknown[]): void => {
+            const globNotation = _item as string;
             // console.log('globNotation', globNotation);
-            const g = new Glob(globNotation);
+            const g = new Glob(globNotation as string);
             const { glob, absGlob, isNegated, levels } = g;
-            let normalized; let emptyValue; let eType;
+            let normalized: string;
+            let emptyValue: Record<string, unknown> | unknown[] | undefined;
+            let eType: string | undefined;
+
             // check whether the glob ends with `.*` or `[*]` then remove
             // trailing glob note and decide for empty value (if negated). for
             // non-negated, trailing wildcards are already removed by
@@ -808,7 +888,7 @@ class Notation {
                     if (insGet.has) filtered.set(normalized, insGet.value, 'overwrite');
                 }
                 // move to the next
-                return true;
+                return;
             }
 
             // if glob has wildcard(s), we'll iterate through keys of the source
@@ -819,7 +899,7 @@ class Notation {
             // indexes when removing items from arrays.
             const reverseIterateIfArray = true;
 
-            _each(this._source, (originalNotation, key, value) => {
+            _each(this._source, (originalNotation: string, key: string | number, value: unknown) => {
                 const originalIsCovered = Glob.create(normalized).covers(originalNotation);
                 // console.log('» normalized:', normalized, 'covers', originalNotation, '»', originalIsCovered);
                 if (!originalIsCovered) return true; // break
@@ -834,7 +914,7 @@ class Notation {
                     if (vType !== eType
                             // we subtract 1 from number of levels bec. the last
                             // note is removed since we have emptyValue set.
-                            && Notation.split(originalNotation).length === levels.length - 1) {
+                            && Notation.split(originalNotation).length === levels - 1) {
                         throw new NotationError(errGlobIntegrity + `'${vType}'.`);
                     }
                 }
@@ -842,13 +922,13 @@ class Notation {
                 // iterating each note of original notation. i.e.:
                 // note1.note2.note3 is iterated from left to right, as:
                 // 'note1', 'note1.note2', 'note1.note2.note3' — in order.
-                Notation.eachNote(originalNotation, levelNotation => {
+                Notation.eachNote(originalNotation, (levelNotation: string) => {
                     // console.log('  level »', glob, 'covers', levelNotation, '»', g.test(levelNotation));
 
                     if (g.test(levelNotation)) {
                         const levelLen = Notation.split(levelNotation).length;
                         /* istanbul ignore else */
-                        if (isNegated && levels.length <= levelLen) {
+                        if (isNegated && (typeof levels === 'number' ? levels <= levelLen : (levels as unknown as string[]).length <= levelLen)) {
                             // console.log('  » removing', levelNotation, 'of', originalNotation);
                             filtered.remove(levelNotation);
                             // we break and return early if removed bec. e.g.
@@ -860,7 +940,9 @@ class Notation {
                         // console.log('  » setting', levelNotation, '=', value);
                         filtered.set(levelNotation, value, 'overwrite');
                     }
+                    return true; // Add explicit return value
                 });
+                return true; // Add explicit return value
             }, reverseIterateIfArray);
         });
         // finally set the filtered's value as the source of our instance and
@@ -883,7 +965,7 @@ class Notation {
      *  Notation.create(obj).remove("car.model");
      *  console.log(obj); // { notebook: "Mac", car: { } }
      */
-    remove(notation) {
+    remove(notation: string): Notation {
         const result = this.inspectRemove(notation);
         // if strict, check if implied index or prop exists
         if (this.options.strict && !result.has) {
@@ -899,7 +981,7 @@ class Notation {
      *  @param {String} notation -
      *  @returns {Notation} -
      */
-    delete(notation) {
+    delete(notation: string): Notation {
         this.remove(notation);
         return this;
     }
@@ -934,7 +1016,7 @@ class Notation {
      *  // { dodge: "Charger", ford: "Mustang" }
      *  // source object (obj) is not modified
      */
-    copyTo(destination, notation, newNotation = null, overwrite = true) {
+    copyTo(destination: Record<string, unknown> | unknown[], notation: string, newNotation: string | null = null, overwrite: boolean = true): Notation {
         if (!utils.isCollection(destination)) throw new NotationError(ERR.DEST);
         const result = this.inspectGet(notation);
         if (result.has) {
@@ -974,7 +1056,7 @@ class Notation {
      *  // { car: { brand: "Ford", model: "Charger" } }
      *  // models object is not modified
      */
-    copyFrom(target, notation, newNotation = null, overwrite = true) {
+    copyFrom(target: Record<string, unknown> | unknown[], notation: string, newNotation: string | null = null, overwrite: boolean = true): Notation {
         if (!utils.isCollection(target)) throw new NotationError(ERR.DEST);
         const result = Notation.create(target).inspectGet(notation);
         if (result.has) {
@@ -1015,7 +1097,7 @@ class Notation {
      *  console.log(models);
      *  // { dodge: "Charger", ford: "Mustang" }
      */
-    moveTo(destination, notation, newNotation = null, overwrite = true) {
+    moveTo(destination: Record<string, unknown> | unknown[], notation: string, newNotation: string | null = null, overwrite: boolean = true): Notation {
         if (!utils.isCollection(destination)) throw new NotationError(ERR.DEST);
         const result = this.inspectRemove(notation);
         if (result.has) {
@@ -1056,7 +1138,7 @@ class Notation {
      *  console.log(models);
      *  // {}
      */
-    moveFrom(target, notation, newNotation = null, overwrite = true) {
+    moveFrom(target: Record<string, unknown> | unknown[], notation: string, newNotation: string | null = null, overwrite: boolean = true): Notation {
         if (!utils.isCollection(target)) throw new NotationError(ERR.DEST);
         const result = Notation.create(target).inspectRemove(notation);
         if (result.has) {
@@ -1090,7 +1172,7 @@ class Notation {
      *  console.log(obj);
      *  // { carBrand: "Ford", carModel: "Mustang" }
      */
-    rename(notation, newNotation, overwrite) {
+    rename(notation: string, newNotation: string, overwrite?: boolean): Notation {
         return this.moveTo(this._source, notation, newNotation, overwrite);
     }
 
@@ -1102,7 +1184,7 @@ class Notation {
      *  @param {Boolean} [overwrite=true] -
      *  @returns {Notation} -
      */
-    renote(notation, newNotation, overwrite) {
+    renote(notation: string, newNotation: string, overwrite?: boolean): Notation {
         return this.rename(notation, newNotation, overwrite);
     }
 
@@ -1129,9 +1211,9 @@ class Notation {
      *  // { carBrand: "Ford" }
      *  // obj is not modified
      */
-    extract(notation, newNotation) {
-        const o = {};
-        this.copyTo(o, notation, newNotation);
+    extract(notation: string, newNotation?: string): Record<string, unknown> {
+        const o: Record<string, unknown> = {};
+        this.copyTo(o, notation, newNotation || null);
         return o;
     }
 
@@ -1142,7 +1224,7 @@ class Notation {
      *  @param {String} newNotation -
      *  @returns {Object} -
      */
-    copyToNew(notation, newNotation) {
+    copyToNew(notation: string, newNotation?: string): Record<string, unknown> {
         return this.extract(notation, newNotation);
     }
 
@@ -1168,9 +1250,9 @@ class Notation {
      *  console.log(extruded);
      *  // { carBrand: "Ford" }
      */
-    extrude(notation, newNotation) {
-        const o = {};
-        this.moveTo(o, notation, newNotation);
+    extrude(notation: string, newNotation?: string): Record<string, unknown> {
+        const o: Record<string, unknown> = {};
+        this.moveTo(o, notation, newNotation || null);
         return o;
     }
 
@@ -1181,7 +1263,7 @@ class Notation {
      *  @param {String} newNotation -
      *  @returns {Object} -
      */
-    moveToNew(notation, newNotation) {
+    moveToNew(notation: string, newNotation?: string): Record<string, unknown> {
         return this.extrude(notation, newNotation);
     }
 
@@ -1210,7 +1292,7 @@ class Notation {
      *  notation.remove('car.model').set('car.color', 'red').value
      *  // » { car: { brand: "Dodge", year: 1970, color: "red" } }
      */
-    static create(source, options) {
+    static create(source?: Record<string, unknown> | unknown[], options?: INotationOptions): Notation {
         if (arguments.length === 0) {
             return new Notation({});
         }
@@ -1236,7 +1318,7 @@ class Notation {
      *  Notation.isValid('@1'); // false (should be "['@1']")
      *  Notation.isValid(null); // false
      */
-    static isValid(notation) {
+    static isValid(notation: unknown): boolean {
         return typeof notation === 'string' && reVALIDATOR.test(notation);
     }
 
@@ -1246,11 +1328,11 @@ class Notation {
      *  @returns {Array} - A string array of notes (levels).
      *  @throws {NotationError} - If given notation is invalid.
      */
-    static split(notation) {
+    static split(notation: string): string[] {
         if (!Notation.isValid(notation)) {
             throw new NotationError(ERR.NOTATION + `'${notation}'`);
         }
-        return notation.match(reMATCHER);
+        return notation.match(reMATCHER) || [];
     }
 
     /**
@@ -1258,8 +1340,8 @@ class Notation {
      *  @param {String} notes  Notes (levels) to be joined.
      *  @returns {String}  Joined notation string.
      */
-    static join(notes) {
-        return utils.joinNotes(notes);
+    static join(notes: (string | null)[]): string {
+        return utils.joinNotes(notes.filter(note => note !== null) as (string | number)[]);
     }
 
     /**
@@ -1269,7 +1351,7 @@ class Notation {
      *  @returns {Number} - Number of notes.
      *  @throws {NotationError} - If given notation is invalid.
      */
-    static countNotes(notation) {
+    static countNotes(notation: string): number {
         return Notation.split(notation).length;
     }
 
@@ -1279,7 +1361,7 @@ class Notation {
      *  @param {String} notation -
      *  @returns {Number} -
      */
-    static countLevels(notation) {
+    static countLevels(notation: string): number {
         return Notation.countNotes(notation);
     }
 
@@ -1292,7 +1374,7 @@ class Notation {
      *  @example
      *  Notation.first('first.prop2.last'); // "first"
      */
-    static first(notation) {
+    static first(notation: string): string {
         return Notation.split(notation)[0];
     }
 
@@ -1305,7 +1387,7 @@ class Notation {
      *  @example
      *  Notation.last('first.prop2.last'); // "last"
      */
-    static last(notation) {
+    static last(notation: string): string {
         const list = Notation.split(notation);
         return list[list.length - 1];
     }
@@ -1321,7 +1403,7 @@ class Notation {
      *  Notation.parent('first.prop2.last'); // "first.prop2"
      *  Notation.parent('single'); // null
      */
-    static parent(notation) {
+    static parent(notation: string): string | null {
         const last = Notation.last(notation);
         return notation.slice(0, -last.length).replace(/\.$/, '') || null;
     }
@@ -1348,13 +1430,14 @@ class Notation {
      *  // 1  "first.prop2"       "prop2"
      *  // 2  "first.prop2.last"  "last"
      */
-    static eachNote(notation, callback) {
+    static eachNote(notation: string, callback: (levelNotation: string, note: string, index: number, list: string[]) => boolean | void): void {
         const notes = Notation.split(notation);
-        const levelNotes = [];
-        utils.each(notes, (note, index) => {
+        const levelNotes: string[] = [];
+        for (let i = 0; i < notes.length; i++) {
+            const note = notes[i];
             levelNotes.push(note);
-            if (callback(Notation.join(levelNotes), note, index, notes) === false) return false;
-        }, Notation);
+            if (callback(Notation.join(levelNotes), note, i, notes) === false) break;
+        }
     }
 
     /**
@@ -1364,7 +1447,7 @@ class Notation {
      *  @param {Function} callback -
      *  @returns {void}
      */
-    static eachLevel(notation, callback) {
+    static eachLevel(notation: string, callback: (levelNotation: string, note: string, index: number, list: string[]) => boolean | void): void {
         Notation.eachNote(notation, callback);
     }
 
@@ -1377,22 +1460,11 @@ class Notation {
  *  @class
  *  @see `{@link #Notation.Error}`
  */
+// @ts-expect-error: To support legacy JavaScript usage in TypeScript
 Notation.Error = NotationError;
-
-/**
- *  Utility for validating, comparing and sorting dot-notation globs.
- *  This is internally used by `Notation` class.
- *  @private
- *
- *  @class
- *  @see `{@link #Notation.Glob}`
- */
+// @ts-expect-error: To support legacy JavaScript usage in TypeScript
 Notation.Glob = Glob;
-
-/**
- *  Undocumented
- *  @private
- */
+// @ts-expect-error: To support legacy JavaScript usage in TypeScript
 Notation.utils = utils;
 
 // --------------------------------
@@ -1417,10 +1489,17 @@ Notation.utils = utils;
  *  @param {Collection} [topSource]  Storage for initial/main collection.
  *  @returns {void}
  */
-function _each(collection, callback, reverseIfArray = false, byLevel = false, parentNotation = null, topSource = null) {
+function _each(
+    collection: Record<string, unknown> | unknown[],
+    callback: (currentNotation: string, note: string | number, value: unknown, source: Record<string, unknown> | unknown[]) => boolean | void,
+    reverseIfArray: boolean = false,
+    byLevel: boolean = false,
+    parentNotation: string | null = null,
+    topSource: Record<string, unknown> | unknown[] | null = null
+): void {
     const source = topSource || collection;
     // if (!utils.isCollection(collection)) throw ... // no need
-    utils.eachItem(collection, (value, keyOrIndex) => {
+    utils.eachItem(collection, (value: unknown, keyOrIndex: string | number) => {
         const note = typeof keyOrIndex === 'number'
             ? `[${keyOrIndex}]`
             : keyOrIndex;
@@ -1432,12 +1511,7 @@ function _each(collection, callback, reverseIfArray = false, byLevel = false, pa
             if (callback(currentNotation, note, value, source) === false) return false;
         }
         // deep iterating if collection
-        if (isCollection) _each(value, callback, reverseIfArray, byLevel, currentNotation, source);
+        if (isCollection) _each(value as Record<string, unknown> | unknown[], callback, reverseIfArray, byLevel, currentNotation, source);
+        return true; // Add explicit return value
     }, null, reverseIfArray);
 }
-
-// --------------------------------
-// EXPORT
-// --------------------------------
-
-export { Notation };
