@@ -1,8 +1,38 @@
+/* eslint-disable max-lines */
+/* eslint-disable max-len */
+/* eslint-disable @typescript-eslint/member-ordering */
 /* eslint no-use-before-define:0, consistent-return:0, max-statements:0 */
 
 import { utils } from '../utils.js';
 import { Notation } from './notation.js';
 import { NotationError } from './notation.error.js';
+
+// Define internal structure for Glob class
+/**
+ * Interface for the internal structure of Glob objects
+ */
+interface IGlobInternals {
+    glob: string;
+    absGlob: string;
+    isNegated: boolean;
+    isArrayGlob: boolean;
+    notes: string[];
+    parent?: string | null;
+    regexp?: RegExp;
+}
+
+/**
+ * Type for the inspected glob object structure
+ */
+interface IInspectedGlob {
+    glob: string;
+    absGlob: string;
+    isNegated: boolean;
+    isArrayGlob: boolean;
+    notes?: string[];
+    last?: string;
+    parent?: string | null;
+}
 
 // http://www.linfo.org/wildcard.html
 // http://en.wikipedia.org/wiki/Glob_%28programming%29
@@ -60,7 +90,12 @@ const ERR_INVALID = 'Invalid glob notation: ';
  *  var glob = new Notation.Glob('billing.account.*');
  *  glob.test('billing.account.id'); // true
  */
-class Glob {
+export class Glob {
+    /**
+     * Internal storage for Glob properties
+     * @private
+     */
+    private _: IGlobInternals;
 
     /**
      *  Constructs a `Notation.Glob` object with the given glob string.
@@ -69,7 +104,7 @@ class Glob {
      *
      *  @throws {NotationError} - If given notation glob is invalid.
      */
-    constructor(glob) {
+    constructor(glob: string) {
         const ins = Glob._inspect(glob);
         const notes = Glob.split(ins.absGlob);
         this._ = {
@@ -86,100 +121,104 @@ class Glob {
     // --------------------------------
 
     /**
-     *  Gets the normalized glob notation string.
+     *  Gets whether this glob represents an array or not.
+     *  @name Notation.Glob#isArrayGlob
+     *  @type {Boolean}
+     */
+    get isArrayGlob(): boolean {
+        return this._.isArrayGlob;
+    }
+
+    /**
+     *  Gets the original (full) glob string of this instance.
      *  @name Notation.Glob#glob
      *  @type {String}
      */
-    get glob() {
+    get glob(): string {
         return this._.glob;
     }
 
     /**
-     *  Gets the absolute glob notation without the negation prefix `!` and
-     *  redundant trailing wildcards.
+     *  Gets the absolute glob string of this instance (without negation `!`
+     *  character if any).
      *  @name Notation.Glob#absGlob
      *  @type {String}
      */
-    get absGlob() {
+    get absGlob(): string {
         return this._.absGlob;
     }
 
     /**
-     *  Specifies whether this glob is negated with a `!` prefix.
+     *  Gets whether this glob is negated (i.e. starts with `!` character).
      *  @name Notation.Glob#isNegated
      *  @type {Boolean}
      */
-    get isNegated() {
+    get isNegated(): boolean {
         return this._.isNegated;
     }
 
     /**
-     *  Represents this glob in regular expressions.
-     *  Note that the negation prefix (`!`) is ignored, if any.
+     *  Gets the RegExp instance generated from the glob string.
      *  @name Notation.Glob#regexp
      *  @type {RegExp}
      */
-    get regexp() {
-        // setting on first call instead of in constructor, for performance
-        // optimization.
-        this._.regexp = this._.regexp || Glob.toRegExp(this.absGlob);
+    get regexp(): RegExp {
+        // lazy create
+        if (!this._.regexp) {
+            this._.regexp = Glob.toRegExp(this.absGlob);
+        }
         return this._.regexp;
     }
 
     /**
-     *  List of notes (levels) of this glob notation. Note that trailing,
-     *  redundant wildcards are removed from the original glob notation.
+     *  Gets the notes within this glob. Notes are parts of a glob, in object
+     *  notation key order.
      *  @name Notation.Glob#notes
-     *  @alias Notation.Glob#levels
      *  @type {Array}
      */
-    get notes() {
+    get notes(): string[] {
         return this._.notes;
     }
 
     /**
-     *  Alias of `Notation.Glob#notes`.
-     *  @private
-     *  @name Notation.Glob#notes
-     *  @alias Notation.Glob#levels
-     *  @type {Array}
+     *  Gets the level of this glob notation.
+     *  @name Notation.Glob#levels
+     *  @type {Number}
      */
-    get levels() {
-        return this._.notes;
+    get levels(): number {
+        return this.notes.length;
     }
 
     /**
-     *  Gets the first note of this glob notation.
+     *  Gets the first (left most) note of this glob notation.
      *  @name Notation.Glob#first
      *  @type {String}
      */
-    get first() {
+    get first(): string {
         return this.notes[0];
     }
 
     /**
-     *  Gets the last note of this glob notation.
+     *  Gets the last (right most) note of this glob notation.
      *  @name Notation.Glob#last
      *  @type {String}
      */
-    get last() {
+    get last(): string {
         return this.notes[this.notes.length - 1];
-    }
-
-    /**
-     *  Gets the parent notation (up to but excluding the last note) from the
-     *  glob notation string. Note that initially, trailing/redundant wildcards
-     *  are removed.
-     *  @name Notation.Glob#parent
-     *  @type {String}
-     *
-     *  @example
-     *  const glob = Notation.Glob.create;
-     *  glob('first.second.*').parent;   // "first.second"
-     *  glob('*.x.*').parent;            // "*" ("*.x.*" normalizes to "*.x")
-     *  glob('*').parent;                // null (no parent)
-     */
-    get parent() {
+    }    /**
+          *  Gets the parent notation (up to but excluding the last note) from the
+          *  glob notation string. Note that initially, trailing/redundant wildcards
+          *  are removed.
+          *  @name Notation.Glob#parent
+          *  @type {String}
+          *
+          *  @example
+          *  const glob = Notation.Glob.create;
+          *  glob('first.second.*').parent;   // "first.second"
+          *  glob('*.x.*').parent;            // "*" ("*.x.*" normalizes to "*.x")
+          *  glob('*').parent;                // null (no parent)
+          */
+    get parent(): string | null {
         // setting on first call instead of in constructor, for performance
         // optimization.
         if (this._.parent === undefined) {
@@ -209,7 +248,7 @@ class Glob {
      *  const glob = new Notation.Glob('!prop.*.name');
      *  glob.test("prop.account.name"); // true
      */
-    test(notation) {
+    test(notation: string): boolean {
         if (!Notation.isValid(notation)) {
             throw new NotationError(`Invalid notation: '${notation}'`);
         }
@@ -232,7 +271,7 @@ class Glob {
      *  glob('*.y').covers('x.y')      // true
      *  glob('x[*].y').covers('x[*]')  // false
      */
-    covers(glob) {
+    covers(glob: string | Glob): boolean {
         return Glob._covers(this, glob);
     }
 
@@ -253,7 +292,7 @@ class Glob {
      *  glob('x.*').intersect('!*.y')         // 'x.y'
      *  glob('x.*').intersect('!*.y', true)   // '!x.y'
      */
-    intersect(glob, restrictive = false) {
+    intersect(glob: string | Glob, restrictive: boolean = false): string | null {
         return Glob._intersect(this.glob, glob, restrictive);
     }
 
@@ -275,7 +314,7 @@ class Glob {
      *  // equivalent to:
      *  const glob = new Notation.Glob(strGlob);
      */
-    static create(glob) {
+    static create(glob: string): Glob {
         return new Glob(glob);
     }
 
@@ -288,7 +327,7 @@ class Glob {
      *  @param {String} glob - Notation glob to be validated.
      *  @returns {Boolean} -
      */
-    static isValid(glob) {
+    static isValid(glob: unknown): boolean {
         return typeof glob === 'string' && reVALIDATOR.test(glob);
     }
 
@@ -301,7 +340,7 @@ class Glob {
      *  @param {String} glob - Glob notation to be checked.
      *  @returns {Boolean} -
      */
-    static hasMagic(glob) {
+    static hasMagic(glob: string): boolean {
         return Glob.isValid(glob) && (re.WILDCARDS.test(glob) || glob[0] === '!');
     }
 
@@ -317,7 +356,7 @@ class Glob {
      *
      *  @throws {NotationError} - If given notation glob is invalid.
      */
-    static toRegExp(glob) {
+    static toRegExp(glob: string): RegExp {
         if (!Glob.isValid(glob)) {
             throw new NotationError(`${ERR_INVALID} '${glob}'`);
         }
@@ -362,7 +401,7 @@ class Glob {
      *  covers('x.y', '*.y', true)  // true
      *  covers('x[*].y', 'x[*]')    // false
      */
-    static _covers(globA, globB, match = false) {
+    static _covers(globA: string | Glob, globB: string | Glob, match: boolean = false): boolean {
         const a = typeof globA === 'string'
             ? new Glob(globA)
             : globA; // assume (globA instanceof Notation.Glob || utils.type(globA) === 'object')
@@ -408,23 +447,23 @@ class Glob {
      *  _intersect('!*.y', 'x.*', false)     // 'x.y'
      *  _intersect('!*.y', 'x.*', true)      // '!x.y'
      */
-    static _intersect(globA, globB, restrictive = false) {
-        // const bang = restrictive
-        //     ? (globA[0] === '!' || globB[0] === '!' ? '!' : '')
-        //     : (globA[0] === '!' && globB[0] === '!' ? '!' : '');
+    static _intersect(globA: string | Glob, globB: string | Glob, restrictive: boolean = false): string | null {
+        // Convert to string if Glob object
+        const strGlobA = typeof globA === 'string' ? globA : globA.glob;
+        const strGlobB = typeof globB === 'string' ? globB : globB.glob;
 
-        const notesA = Glob.split(globA, true);
-        const notesB = Glob.split(globB, true);
+        const notesA = Glob.split(strGlobA, true);
+        const notesB = Glob.split(strGlobB, true);
 
         let bang;
         if (restrictive) {
-            bang = globA[0] === '!' || globB[0] === '!' ? '!' : '';
+            bang = strGlobA[0] === '!' || strGlobB[0] === '!' ? '!' : '';
         } else {
-            if (globA[0] === '!' && globB[0] === '!') {
+            if (strGlobA[0] === '!' && strGlobB[0] === '!') {
                 bang = '!';
             } else {
-                bang = ((notesA.length > notesB.length && globA[0] === '!')
-                        || (notesB.length > notesA.length && globB[0] === '!'))
+                bang = ((notesA.length > notesB.length && strGlobA[0] === '!')
+                        || (notesB.length > notesA.length && strGlobB[0] === '!'))
                     ? '!'
                     : '';
             }
@@ -476,9 +515,9 @@ class Glob {
      *  @private
      *
      *  @param {String} glob -
-     *  @returns {Object} -
+     *  @returns {IInspectedGlob} -
      */
-    static _inspect(glob) {
+    static _inspect(glob: string): IInspectedGlob {
         let g = glob.trim();
         if (!Glob.isValid(g)) {
             throw new NotationError(`${ERR_INVALID} '${glob}'`);
@@ -512,14 +551,15 @@ class Glob {
      *  Notation.Glob.split('*.list[2].prop')  // ['*', 'list', '[2]', 'prop']
      *  // you can get the same result from the .notes property of a Notation.Glob instance.
      */
-    static split(glob, normalize = false) {
-        if (!Glob.isValid(glob)) {
-            throw new NotationError(`${ERR_INVALID} '${glob}'`);
+    static split(glob: string | Glob, normalize: boolean = false): string[] {
+        const strGlob = typeof glob === 'string' ? glob : glob.glob;
+        if (!Glob.isValid(strGlob)) {
+            throw new NotationError(`${ERR_INVALID} '${strGlob}'`);
         }
-        const neg = glob[0] === '!';
+        const neg = strGlob[0] === '!';
         // trailing wildcards are redundant only when not negated
-        const g = !neg && normalize ? utils.removeTrailingWildcards(glob) : glob;
-        return g.replace(/^!/, '').match(reMATCHER);
+        const g = !neg && normalize ? utils.removeTrailingWildcards(strGlob) : strGlob;
+        return g.replace(/^!/, '').match(reMATCHER) || [];
     }
 
     /**
@@ -552,13 +592,16 @@ class Glob {
      *  compare('*', '[*]')                     // 0
      *  compare('info.*.name', 'info.user')     // 1
      */
-    static compare(globA, globB) {
+    static compare(globA: string | Glob, globB: string | Glob): number {
         // trivial case, both are exactly the same!
         // or both are wildcard e.g. `*` or `[*]`
-        if (globA === globB || (re.WILDCARD.test(globA) && re.WILDCARD.test(globB))) return 0;
+        const strGlobA = typeof globA === 'string' ? globA : globA.glob;
+        const strGlobB = typeof globB === 'string' ? globB : globB.glob;
 
-        const a = new Glob(globA);
-        const b = new Glob(globB);
+        if (strGlobA === strGlobB || (re.WILDCARD.test(strGlobA) && re.WILDCARD.test(strGlobB))) return 0;
+
+        const a = new Glob(strGlobA);
+        const b = new Glob(strGlobB);
 
         // Check depth (number of levels)
         if (a.notes.length === b.notes.length) {
@@ -603,7 +646,7 @@ class Glob {
      *  @example
      *  Notation.Glob.sort(['!prop.*.name', 'prop.*', 'prop.id']) // ['prop.*', 'prop.id', '!prop.*.name'];
      */
-    static sort(globList) {
+    static sort(globList: (string | Glob)[]): (string | Glob)[] {
         return globList.sort(Glob.compare);
     }
 
@@ -648,7 +691,7 @@ class Glob {
      *  // restrictive normalize:
      *  normalize(['*', 'car.model', '!car.*'], true); // ["*", "!car.*"]
      */
-    static normalize(globList, restrictive = false) {
+    static normalize(globList: (string | Glob)[], restrictive: boolean = false): string[] {
         const { _inspect, _covers, _intersect } = Glob;
 
         const original = utils.ensureArray(globList);
@@ -664,7 +707,7 @@ class Glob {
             // turning string array into inspect-obj array, so that we'll not
             // run _inspect multiple times in the inner loop. this also
             // pre-validates each glob.
-            .map(_inspect);
+            .map((value: unknown) => _inspect(value as string));
 
         // early return if we have a single item
         if (list.length === 1) {
@@ -679,29 +722,32 @@ class Glob {
         let negateAll = false;
 
         // we'll push keepers in this array
-        let normalized = [];
+        let normalized: string[] = [];
         // we'll need to remember excluded globs, so that we can move to next
         // item early.
-        const ignored = {};
+        const ignored: Record<string, boolean> = {};
 
         // storage to keep intersections.
         // using an object to prevent duplicates.
-        let intersections = {};
+        const intersectionsMap: Record<string, string> = {};
 
-        function checkAddIntersection(gA, gB) {
+        // Function to check and add intersection
+        const checkAddIntersection = (gA: string, gB: string): void => {
             const inter = _intersect(gA, gB, restrictive);
             if (!inter) return;
             // if the intersection result has an inverted version in the
             // original list, don't add this.
             const hasInverted = restrictive ? false : original.indexOf(_invert(inter)) >= 0;
             // also if intersection result is in the current list, don't add it.
-            if (list.indexOf(inter) >= 0 || hasInverted) return;
-            intersections[inter] = inter;
-        }
+            const interInList = list.some((item: IInspectedGlob) => item.glob === inter);
+            if (interInList || hasInverted) return;
+            intersectionsMap[inter] = inter;
+        };
 
         // iterate each glob by comparing it to remaining globs.
-        utils.eachRight(list, (a, indexA) => {
-
+        // Type cast to work with the eachRight utility function
+        utils.eachRight(list as unknown[], (item: unknown, indexA: number): boolean | undefined => {
+            const a = item as IInspectedGlob;
             // if `strict` is enabled, return empty if a negate-all is found
             // (which itself is also redundant if single): '!*' or '![*]'
             if (re.NEGATE_ALL.test(a.glob)) {
@@ -721,7 +767,8 @@ class Glob {
             let posCoveredByNeg = false;
             let posCoveredByPos = false;
 
-            utils.eachRight(list, (b, indexB) => {
+            utils.eachRight(list as unknown[], (itemB: unknown, indexB: number): boolean | undefined => {
+                const b = itemB as IInspectedGlob;
                 // don't inspect glob with itself
                 if (indexA === indexB) return; // move to next
                 // console.log(indexA, a.glob, 'vs', b.glob);
@@ -751,8 +798,11 @@ class Glob {
                 // if already excluded b, go on to next
                 if (ignored[b.glob]) return; // next
 
-                const coversB = _covers(a, b);
-                const coveredByB = coversB ? false : _covers(b, a);
+                // Create Glob instances for type safety
+                const aGlob = new Glob(a.glob);
+                const bGlob = new Glob(b.glob);
+                const coversB = _covers(aGlob, bGlob);
+                const coveredByB = coversB ? false : _covers(bGlob, aGlob);
                 if (a.isNegated) {
                     if (b.isNegated) {
                         // if negated (a) covered by any other negated (b); remove (a)!
@@ -802,6 +852,7 @@ class Glob {
                     }
                 }
 
+                return undefined; // Explicit return to satisfy TypeScript
             });
 
             // const keepNeg = (negCoversPos || negCoveredByPos) && !negCoveredByNeg;
@@ -822,19 +873,20 @@ class Glob {
                 // ignored (don't remove from "list" for now)
                 ignored[a.glob] = true;
             }
+            return undefined; // Explicit return to satisfy TypeScript
         });
 
         if (restrictive && negateAll) return [];
 
-        intersections = Object.keys(intersections);
-        if (intersections.length > 0) {
+        const intersectionsArray = Object.keys(intersectionsMap);
+        if (intersectionsArray.length > 0) {
             // merge normalized list with intersections if any
-            normalized = normalized.concat(intersections);
+            normalized = normalized.concat(intersectionsArray);
             // we have new (intersection) items, so re-normalize
             return Glob.normalize(normalized, restrictive);
         }
 
-        return Glob.sort(normalized);
+        return Glob.sort(normalized).map(g => typeof g === 'string' ? g : g.glob);
     }
 
     /**
@@ -849,12 +901,13 @@ class Glob {
      *  @param {Array} union -
      *  @returns {Array} -
      */
-    static _compareUnion(globsListA, globsListB, restrictive, union = []) {
+    static _compareUnion(globsListA: string[], globsListB: string[], restrictive: boolean, union: string[] = []): string[] {
         const { _covers } = Glob;
 
         const { _inspect, _intersect } = Glob;
 
-        utils.eachRight(globsListA, globA => {
+        utils.eachRight(globsListA as unknown[], (itemA: unknown) => {
+            const globA = itemA as string;
             if (union.indexOf(globA) >= 0) return; // next
 
             const a = _inspect(globA);
@@ -872,9 +925,10 @@ class Glob {
             let posCoversPos = false;
             let negCoversPos = false;
 
-            const intersections = [];
+            const intersections: string[] = [];
 
-            utils.eachRight(globsListB, globB => {
+            utils.eachRight(globsListB as unknown[], (itemB: unknown) => {
+                const globB = itemB as string;
 
                 // keep if has exact in the other
                 if (globA === globB) hasExact = true;
@@ -887,7 +941,10 @@ class Glob {
                 // keep positive if:
                 //    1) no positive covers it OR any negated covers it
 
-                notCovered = !_covers(b, a);
+                // Create Glob instances for type safety
+                const aGlob = new Glob(a.glob);
+                const bGlob = new Glob(b.glob);
+                notCovered = !_covers(bGlob, aGlob);
                 if (notCovered) {
                     if (a.isNegated && b.isNegated) {
                         const inter = _intersect(a.glob, b.glob, restrictive);
@@ -967,11 +1024,15 @@ class Glob {
      *  const { union } = Notation.Glob;
      *  union(a, b)     // ['car', 'user', '*.age', '!car.date', '!user.id']
      */
-    static union(globsA, globsB, restrictive) {
+    static union(
+        globsA: string | string[],
+        globsB: string | string[],
+        restrictive: boolean = false
+    ): string[] {
         const { normalize, _compareUnion } = Glob;
 
-        const listA = normalize(globsA, restrictive);
-        const listB = normalize(globsB, restrictive);
+        const listA = normalize(Array.isArray(globsA) ? globsA : [globsA], restrictive);
+        const listB = normalize(Array.isArray(globsB) ? globsB : [globsB], restrictive);
 
         if (listA.length === 0) return listB;
         if (listB.length === 0) return listA;
@@ -989,7 +1050,7 @@ class Glob {
 // --------------------------------
 
 // used by static _covers
-function _coversNote(a, b) {
+function _coversNote(a: string | null, b: string | null): boolean {
     if (!a || !b) return false; // glob e.g.: [2] does not cover [2][1]
     const bIsArr = re.ARRAY_GLOB_NOTE.test(b);
     // obj-wildcard a will cover b if not array
@@ -1012,7 +1073,7 @@ function _coversNote(a, b) {
 //     return (a === '*' && !bIsArr) || (a === '[*]' && bIsArr);
 // }
 // used by static _covers
-function _matchesNote(a, b) {
+function _matchesNote(a: string | null, b: string | null): boolean {
     if (!a || !b) return true; // glob e.g.: [2][1] matches [2] and vice-versa.
     return _coversNote(a, b) || _coversNote(b, a);
 }
@@ -1020,7 +1081,7 @@ function _matchesNote(a, b) {
 // used by _compareArrayItemGlobs() for getting a numeric index from array note.
 // we'll use these indexes to sort higher to lower, as removing order; to
 // prevent shifted indexes.
-function _idxVal(note) {
+function _idxVal(note: string): number {
     // we return -1 for wildcard bec. we need it to come last
 
     // below will never execute when called from _compareArrayItemGlobs
@@ -1031,7 +1092,7 @@ function _idxVal(note) {
     return parseInt(note.replace(/[[\]]/, ''), 10);
 }
 
-function _compArrIdx(lastA, lastB) {
+function _compArrIdx(lastA: string, lastB: string): number {
     const iA = _idxVal(lastA);
     const iB = _idxVal(lastB);
 
@@ -1049,16 +1110,19 @@ function _compArrIdx(lastA, lastB) {
 
 // example items from same array: ![*][2] ![0][*] ![0][1] ![0][3]
 // should be sorted as ![0][3] ![*][2] ![0][1] ![0][*]
-function _compareArrayItemGlobs(a, b) {
+function _compareArrayItemGlobs(
+    a: IInspectedGlob & { notes?: string[]; last?: string; parent?: string | null },
+    b: IInspectedGlob & { notes?: string[]; last?: string; parent?: string | null }
+): number {
     const reANote = re.ARRAY_GLOB_NOTE;
     // both should be negated
     if (!a.isNegated
             || !b.isNegated
             // should be same length (since we're comparing for items in same
             // array)
-            || a.notes.length !== b.notes.length
+            || (a.notes?.length !== b.notes?.length)
             // last notes should be array brackets
-            || !reANote.test(a.last)
+            || !a.last || !b.last || !reANote.test(a.last)
             || !reANote.test(b.last)
             // last notes should be different to compare
             || a.last === b.last
@@ -1083,35 +1147,36 @@ function _compareArrayItemGlobs(a, b) {
 // x[*] vs !x       » true
 // x[*] vs !x[*]    » false
 // x.* vs !x.*      » false
-function _isReverseOf(a, b) {
-    return a.isNegated !== b.isNegated
-        && a.absGlob === b.absGlob;
+function _isReverseOf(
+    a: { isNegated: boolean; glob: string; absGlob: string },
+    b: { isNegated: boolean; glob: string; absGlob: string }
+): boolean {
+    return a.isNegated !== b.isNegated && a.absGlob === b.absGlob;
 }
 
-function _invert(glob) {
+function _invert(glob: string): string {
     return glob[0] === '!' ? glob.slice(1) : '!' + glob;
 }
 
 const _rx = /^\s*!/;
-function _negFirstSort(a, b) {
-    const negA = _rx.test(a);
-    const negB = _rx.test(b);
-    if (negA && negB) return a.length >= b.length ? 1 : -1;
+function _negFirstSort(a: unknown, b: unknown): number {
+    const strA = a as string;
+    const strB = b as string;
+    const negA = _rx.test(strA);
+    const negB = _rx.test(strB);
+    if (negA && negB) return strA.length >= strB.length ? 1 : -1;
     if (negA) return -1;
     if (negB) return 1;
     return 0;
 }
-function _negLastSort(a, b) {
-    const negA = _rx.test(a);
-    const negB = _rx.test(b);
-    if (negA && negB) return a.length >= b.length ? 1 : -1;
+
+function _negLastSort(a: unknown, b: unknown): number {
+    const strA = a as string;
+    const strB = b as string;
+    const negA = _rx.test(strA);
+    const negB = _rx.test(strB);
+    if (negA && negB) return strA.length >= strB.length ? 1 : -1;
     if (negA) return 1;
     if (negB) return -1;
     return 0;
 }
-
-// --------------------------------
-// EXPORT
-// --------------------------------
-
-export { Glob };
