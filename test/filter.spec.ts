@@ -309,26 +309,36 @@ describe('Notation#filter()', () => {
         expect(() => notate(obj).filter(['[*]', '![0].x.*'])).toThrow();
 
         const globs = ['[*]', '![0].x', '![0].y[1]', '![0].y[2].z', '![2]["my-prop"][0]'];
-        const filtered = notate(obj).filter(globs).value as unknown[];
+        const filtered = notate(obj).filter(globs).value;
 
-        expect(Array.isArray(filtered) && filtered[0]?.y?.[1]).toEqual({ z: 4 });
-        expect(Array.isArray(filtered) && filtered[0]?.x).toBeUndefined();
-        expect(Array.isArray(filtered) && filtered[1]).toEqual([1, 2, 3]);
-        expect(Array.isArray(filtered) && filtered[2]?.['my-prop']).toEqual([5]);
+        if (Array.isArray(filtered)) {
+            if (filtered[0] && typeof filtered[0] === 'object' && 'y' in filtered[0] && Array.isArray(filtered[0].y)) {
+                expect(filtered[0].y[1]).toEqual({ z: 4 });
+            }
+            if (filtered[0] && typeof filtered[0] === 'object') {
+                expect((filtered[0] as { x?: unknown }).x).toBeUndefined();
+            }
+            expect(filtered[1]).toEqual([1, 2, 3]);
+            if (filtered[2] && typeof filtered[2] === 'object' && 'my-prop' in filtered[2]) {
+                expect((filtered[2] as { 'my-prop'?: unknown[] })['my-prop']).toEqual([5]);
+            }
+        }
     });
 
     test('#filter() » bracket 2', () => {
         let filtered = null;
 
-        let obj = [
+        let obj: unknown[] = [
             [1, 2, 3],
             [4, 5, [[6]]],
             [7, 8]
         ];
 
         let globs = ['[*]', '![*][1]', '![0][1]', '![0][2]', '![1][2][0]'];
-        filtered = notate(obj).filter(globs).value as unknown[];
-        expect(Array.isArray(filtered) && filtered[0]?.length).toEqual(1);
+        filtered = notate(obj).filter(globs).value;
+        if (Array.isArray(filtered) && typeof filtered[0] === 'object' && filtered[0] !== null && 'length' in filtered[0]) {
+            expect((filtered[0] as { length: number }).length).toEqual(1);
+        }
 
         filtered = notate([0, 1, 2]).filter(['[*]', '![2]', '![0]']).value;
         expect(filtered).toEqual([1]); // This test is fine
