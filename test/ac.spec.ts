@@ -4,11 +4,17 @@ import { Notation } from '../src/core/notation.js';
 const notate = Notation.create;
 const { union } = Notation.Glob;
 
+// Define type for data or filtered values in the test
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FilteredObject = Record<string, any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FilteredArray = any[];
+
 describe('ac', () => {
 
     test('#filter()', () => {
         let globs = ['*', '!account.balance.credit', '!account.id', '!secret'];
-        let data = {
+        const data = {
             name: 'Company, LTD.',
             address: {
                 city: 'istanbul',
@@ -26,29 +32,29 @@ describe('ac', () => {
                 value: 'hidden'
             }
         };
-        let filtered = notate(data).filter(globs).value;
+        let filtered = notate(data).filter(globs).value as FilteredObject;
         expect(filtered.name).toEqual(expect.any(String));
         expect(filtered.address).toEqual(expect.any(Object));
-        expect(filtered.address.city).toEqual('istanbul');
+        expect((filtered.address as FilteredObject).city).toEqual('istanbul');
         expect(filtered.account).toBeDefined();
-        expect(filtered.account.id).toBeUndefined();
-        expect(filtered.account.balance).toBeDefined();
-        expect(filtered.account.credit).toBeUndefined();
+        expect((filtered.account as FilteredObject).id).toBeUndefined();
+        expect((filtered.account as FilteredObject).balance).toBeDefined();
+        expect((filtered.account as FilteredObject).credit).toBeUndefined();
         expect(filtered.secret).toBeUndefined();
 
-        filtered = notate(data).filter('!*').value;
+        filtered = notate(data).filter('!*').value as FilteredObject;
         expect(filtered).toEqual({});
 
         // filtering array of objects
         globs = ['*', '!id'];
-        data = [
+        const arrayData = [
             { id: 1, name: 'x', age: 30 },
             { id: 2, name: 'y', age: 31 },
             { id: 3, name: 'z', age: 32 }
         ];
-        filtered = notate(data).filter(globs).value;
-        expect(filtered).toEqual(expect.any(Array));
-        expect(filtered.length).toEqual(data.length);
+        const arrayFiltered = notate(arrayData).filter(globs).value as FilteredArray;
+        expect(arrayFiltered).toEqual(expect.any(Array));
+        expect(arrayFiltered.length).toEqual(arrayData.length);
     });
 
     test('#filter() 2', () => {
@@ -60,10 +66,10 @@ describe('ac', () => {
                 country: 'US'
             }
         };
-        const filtered = notate(o).filter(['*', '!account.id', '!age']).value;
+        const filtered = notate(o).filter(['*', '!account.id', '!age']).value as FilteredObject;
         expect(filtered.name).toEqual('John');
-        expect(filtered.account.id).toBeUndefined();
-        expect(filtered.account.country).toEqual('US');
+        expect((filtered.account as FilteredObject).id).toBeUndefined();
+        expect((filtered.account as FilteredObject).country).toEqual('US');
 
         expect(o.account.id).toEqual(1);
         expect(o).not.toEqual(filtered);
