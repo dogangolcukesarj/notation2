@@ -7,7 +7,7 @@ const setProto = Object.setPrototypeOf;
  *  @class
  *  @name Notation.Error
  */
-class NotationError extends Error {
+export class NotationError extends Error {
 
     /**
      *  Initializes a new `Notation.Error` instance.
@@ -15,7 +15,7 @@ class NotationError extends Error {
      *  @constructs Notation.Error
      *  @param {String} message - The error message.
      */
-    constructor(message = '') {
+    constructor(message: string = '') {
         super(message);
         setProto(this, NotationError.prototype);
 
@@ -44,5 +44,3 @@ class NotationError extends Error {
     }
 
 }
-
-export { NotationError };
