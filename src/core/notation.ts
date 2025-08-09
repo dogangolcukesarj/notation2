@@ -82,6 +82,11 @@ interface IInspectResult {
 }
 
 export class Notation {
+    // Static references to related classes and utilities
+    static Glob: typeof Glob = Glob;
+    static Error: typeof NotationError = NotationError;
+    static utils: typeof utils = utils;
+
     // Private properties
     private _source: Record<string, unknown> | unknown[];
     private _options: INotationOptions = {};
@@ -152,6 +157,7 @@ export class Notation {
      *      .set("age", 36)
      *      .set("car.brand", "Ford")
      *      .set("car.model", "Mustang")
+     *      .set("car.year", 1970)
      *      .value;
      *  console.log(me); // { name: "Onur", age: 36, car: { brand: "Ford", model: "Mustang" } }
      *  console.log(person === me); // true
@@ -242,7 +248,6 @@ export class Notation {
      *  prevent mutating the original source object.
      *
      *  <blockquote>
-     *  Note that `Notation` expects a data object (or array) with enumerable
      *  properties. In addition to plain objects and arrays; supported cloneable
      *  property/value types are primitives (such as `String`, `Number`,
      *  `Boolean`, `Symbol`, `null` and `undefined`) and built-in types (such as
@@ -1460,12 +1465,10 @@ export class Notation {
  *  @class
  *  @see `{@link #Notation.Error}`
  */
-// @ts-expect-error: To support legacy JavaScript usage in TypeScript
-Notation.Error = NotationError;
-// @ts-expect-error: To support legacy JavaScript usage in TypeScript
-Notation.Glob = Glob;
-// @ts-expect-error: To support legacy JavaScript usage in TypeScript
-Notation.utils = utils;
+// We already defined these properties in the class definition
+// Notation.Error = NotationError;
+// Notation.Glob = Glob;
+// Notation.utils = utils;
 
 // --------------------------------
 // HELPERS
