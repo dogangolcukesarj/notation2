@@ -3,7 +3,7 @@
 import { Notation } from '../src/core/notation.js';
 
 // shuffle array
-function shuffle(o) { // v1.0
+function shuffle(o: unknown[]): unknown[] { // v1.0
     for (let j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
     return o;
 }
@@ -27,10 +27,10 @@ describe('Notation.Glob', () => {
         expect(isValid('pro*')).toEqual(false);
         expect(isValid('.prop')).toEqual(false);
         expect(isValid('.')).toEqual(false);
-        expect(isValid()).toEqual(false);
-        expect(isValid(1)).toEqual(false);
-        expect(isValid(null)).toEqual(false);
-        expect(isValid(true)).toEqual(false);
+        expect(isValid('')).toEqual(false);
+        expect(isValid('1')).toEqual(false);
+        expect(isValid('null')).toEqual(false);
+        expect(isValid('true')).toEqual(false);
         expect(isValid('')).toEqual(false);
         expect(isValid('*.')).toEqual(false);
         expect(isValid('*')).toEqual(true);
@@ -74,13 +74,13 @@ describe('Notation.Glob', () => {
         expect(hasMagic('x.*')).toEqual(true);
         expect(hasMagic('[*].x.y.*')).toEqual(true);
         expect(hasMagic('')).toEqual(false);
-        expect(hasMagic(null)).toEqual(false); // invalid
-        expect(hasMagic(true)).toEqual(false); // invalid
+        expect(hasMagic('null')).toEqual(false); // invalid
+        expect(hasMagic('true')).toEqual(false); // invalid
         expect(hasMagic('*.')).toEqual(false); // invalid
     });
 
     test('.toRegExp()', () => {
-        expect(() => toRegExp().source).toThrow();
+        expect(() => toRegExp('invalid')).toThrow();
         expect(() => toRegExp('').source).toThrow();
         expect(() => toRegExp('*.').source).toThrow();
         expect(toRegExp('*').source).toEqual('^' + reVAR + reREST);
@@ -103,7 +103,7 @@ describe('Notation.Glob', () => {
     });
 
     test('.split()', () => {
-        expect(() => split()).toThrow();
+        expect(() => split('')).toThrow();
         expect(() => split('')).toThrow();
         expect(() => split('.x')).toThrow();
         expect(() => split('[x]')).toThrow();
@@ -222,13 +222,11 @@ describe('Notation.Glob', () => {
         //  '!foo.*.boo'    vs 'foo.qux.*'  => '!foo.*.boo', 'foo.qux.*'
         //  'foo.*.boo'     vs '!foo.qux.*' => 'foo.*.boo', '!foo.qux.*'
 
-        let i, shuffled;
-        function indexOf(v) {
-            return shuffled.indexOf(v);
-        }
+        let i: number; let shuffled: string[];
+        const indexOf = (v: string): number => shuffled.indexOf(v);
         for (i = 0; i <= 10; i++) {
-            shuffled = shuffle(globs.concat());
-            shuffled = sort(shuffled);
+            shuffled = shuffle(globs.concat()) as string[];
+            shuffled = sort(shuffled) as string[];
             // console.log(shuffled);
             expect(shuffled).toEqual(expectedSorted);
             expect(indexOf('*')).toEqual(0);
@@ -263,11 +261,11 @@ describe('Notation.Glob', () => {
             '!bar.id'
         ];
 
-        let i, shuffled, sorted, indexN, indexNeg;
+        let i: number; let shuffled: string[]; let sorted: string[]; let indexN: number; let indexNeg: number;
         for (i = 0; i <= 10; i++) {
-            shuffled = shuffle(original.concat());
+            shuffled = shuffle(original.concat()) as string[];
             // console.log(shuffled);
-            sorted = sort(shuffled);
+            sorted = sort(shuffled) as string[];
             indexN = sorted.indexOf('bar.id');
             indexNeg = sorted.indexOf('!bar.id');
 
@@ -308,10 +306,10 @@ describe('Notation.Glob', () => {
         expect(() => g2.test('*')).toThrow();
         expect(() => g2.test('[1].*')).toThrow();
 
-        expect(() => new Notation.Glob()).toThrow();
+        expect(() => new Notation.Glob('invalid')).toThrow();
         expect(() => new Notation.Glob('')).toThrow();
         expect(() => new Notation.Glob('%.s')).toThrow();
-        expect(() => create()).toThrow();
+        expect(() => create('invalid')).toThrow();
         expect(() => create('')).toThrow();
         expect(() => create('s .')).toThrow();
     });
@@ -370,7 +368,7 @@ describe('Notation.Glob', () => {
     });
 
     test('#covers(), ._covers()', () => {
-        const cov = (globA, globB) => create(globA).covers(globB);
+        const cov = (globA: string, globB: string): boolean => create(globA).covers(globB);
 
         expect(cov('*.*', 'b')).toEqual(true);
         expect(cov('*.b', 'b')).toEqual(false);
@@ -393,7 +391,7 @@ describe('Notation.Glob', () => {
         expect(cov('a.*', 'a.b[1]')).toEqual(true);
         expect(cov('a.*', 'a.b[*].c')).toEqual(true);
         expect(cov('a.b[*].c', 'a.b[*]')).toEqual(false);
-        expect(cov('a.b[*]', new Notation.Glob('a.b[2].c'))).toEqual(true);
+        expect(cov('a.b[*]', 'a.b[2].c')).toEqual(true);
         expect(cov('[1].*.b[*].*.d', '[1].a.b[3].c.d')).toEqual(true);
         expect(cov('[1].*.b[*].*.d', '[2].a.b')).toEqual(false);
 
@@ -423,23 +421,23 @@ describe('Notation.Glob', () => {
         expect(_covers('[4][*]', '[*][*][1]', true)).toEqual(true);
 
         // object key bracket notation
-        expect(_covers("*['x']", 'a.x')).toEqual(true);
+        expect(_covers('*[\'x\']', 'a.x')).toEqual(true);
         expect(_covers('*["x"]', 'a.x')).toEqual(true);
         expect(_covers('*["x"]', 'a["x"]')).toEqual(true);
-        expect(_covers("*['x']", "a['x']")).toEqual(true);
-        expect(_covers('*', "['x']")).toEqual(true);
+        expect(_covers('*[\'x\']', 'a[\'x\']')).toEqual(true);
+        expect(_covers('*', '[\'x\']')).toEqual(true);
         expect(_covers('*', '["x.y"]')).toEqual(true);
-        expect(_covers('[*]', "['x']")).toEqual(false);
-        expect(_covers('*', "['*']")).toEqual(true);
-        expect(_covers('*', "['[*]']")).toEqual(true);
-        expect(_covers('[*]', "['[*]']")).toEqual(false);
-        expect(_covers('x.y', "['x.y']")).toEqual(false);
-        expect(_covers('x.y', "x['y']")).toEqual(true);
+        expect(_covers('[*]', '[\'x\']')).toEqual(false);
+        expect(_covers('*', '[\'*\']')).toEqual(true);
+        expect(_covers('*', '[\'[*]\']')).toEqual(true);
+        expect(_covers('[*]', '[\'[*]\']')).toEqual(false);
+        expect(_covers('x.y', '[\'x.y\']')).toEqual(false);
+        expect(_covers('x.y', 'x[\'y\']')).toEqual(true);
         expect(_covers('x.y', 'x[\'y\']')).toEqual(true);
     });
 
     test('#intersect(), ._intersect()', () => {
-        const intersect = (globA, globB, restrictive = false) => create(globA).intersect(globB, restrictive);
+        const intersect = (globA: string, globB: string, restrictive = false): string | null => create(globA).intersect(globB, restrictive);
         // x.* ∩ *.y    » x.y
         // x.*.* ∩ *.y  » x.y.*
         // x.*.z ∩ *.y  » x.y.z
@@ -485,7 +483,7 @@ describe('Notation.Glob', () => {
     });
 
     test('.normalize() restrictive = false', () => {
-        const norm = globs => normalize(globs, false);
+        const norm = (globs: string[]): string[] => normalize(globs, false);
 
         expect(() => norm(['*.[*]'])).toThrow();
         expect(() => norm(['*.[*]', 'x'])).toThrow();
@@ -632,7 +630,7 @@ describe('Notation.Glob', () => {
     });
 
     test('.normalize() restrictive = true', () => {
-        const norm = globs => normalize(globs, true);
+        const norm = (globs: string[]): string[] => normalize(globs, true);
 
         expect(() => norm(['*.[*]'])).toThrow();
         expect(() => norm(['*.[*]', 'x'])).toThrow();
@@ -760,7 +758,7 @@ describe('Notation.Glob', () => {
     });
 
     test('.union() restrictive = false', () => {
-        const uni = (a, b) => union(a, b, false);
+        const uni = (a: string[], b: string[]): string[] => union(a, b, false);
 
         expect(uni([], ['*', 'x.y'])).toEqual(['*']);
         expect(uni(['*', 'x.y'], [])).toEqual(['*']);
@@ -826,7 +824,7 @@ describe('Notation.Glob', () => {
     });
 
     test('.union() restrictive = true', () => {
-        const uni = (a, b) => union(a, b, true);
+        const uni = (a: string[], b: string[]): string[] => union(a, b, true);
 
         expect(uni([], ['*', 'x.y'])).toEqual(['*']);
         expect(uni(['*', 'x.y'], [])).toEqual(['*']);
