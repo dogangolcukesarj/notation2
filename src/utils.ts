@@ -21,8 +21,6 @@ const NON_NEG_WILDCARD_TRAIL = /^(?!!)(.+?)(\.\*|\[\*\])+$/;
 const NEGATE_ALL = /^!(\*|\[\*\])$/;
 // ending with '.*' or '[*]'
 
-const _reFlags = /\w*$/;
-
 const utils = {
 
     re: {
@@ -36,21 +34,20 @@ const utils = {
         NEGATE_ALL
     },
 
-    type(o) {
-        return objProto.toString.call(o).match(/\s(\w+)/i)[1].toLowerCase();
+    type: (o: unknown): string => {
+        const match = objProto.toString.call(o).match(/\s(\w+)/i);
+        return match && match[1] ? match[1].toLowerCase() : '';
     },
 
-    isCollection(o) {
+    isCollection: (o: unknown): boolean => {
         const t = utils.type(o);
         return t === 'object' || t === 'array';
     },
 
-    isset(o) {
-        return o !== undefined && o !== null;
-    },
+    isset: (o: unknown): boolean => o !== undefined && o !== null,
 
-    ensureArray(o) {
-        if (utils.type(o) === 'array') return o;
+    ensureArray: (o: unknown): unknown[] => {
+        if (utils.type(o) === 'array') return o as unknown[];
         return o === null || o === undefined ? [] : [o];
     },
 
@@ -63,41 +60,42 @@ const utils = {
     // },
 
     // added _collectionType for optimization (in loops)
-    hasOwn(collection, keyOrIndex, _collectionType) {
+    hasOwn: (collection: unknown, keyOrIndex: string | number, _collectionType?: string): boolean => {
         if (!collection) return false;
         const isArr = (_collectionType || utils.type(collection)) === 'array';
         if (!isArr && typeof keyOrIndex === 'string') {
-            return keyOrIndex && objProto.hasOwnProperty.call(collection, keyOrIndex);
+            return !!keyOrIndex && objProto.hasOwnProperty.call(collection, keyOrIndex);
         }
         if (typeof keyOrIndex === 'number') {
-            return keyOrIndex >= 0 && keyOrIndex < collection.length;
+            return keyOrIndex >= 0 && keyOrIndex < (collection as unknown[]).length;
         }
         return false;
     },
 
-    cloneDeep(collection) {
+    cloneDeep: (collection: unknown): unknown => {
         const t = utils.type(collection);
         switch (t) {
             case 'date':
-                return new Date(collection.valueOf());
+                return new Date((collection as Date).valueOf());
             case 'regexp': {
-                const flags = _reFlags.exec(collection).toString();
-                const copy = new collection.constructor(collection.source, flags);
-                copy.lastIndex = collection.lastIndex;
+                const regexp = collection as RegExp;
+                const flags = regexp.flags;
+                const copy = new RegExp(regexp.source, flags);
+                copy.lastIndex = regexp.lastIndex;
                 return copy;
             }
             case 'symbol':
                 return symValueOf
-                    ? Object(symValueOf.call(collection))
+                    ? Object(symValueOf.call(collection as symbol))
                     /* istanbul ignore next */
                     : collection;
             case 'array':
-                return collection.map(utils.cloneDeep);
+                return (collection as unknown[]).map(utils.cloneDeep);
             case 'object': {
-                const copy = {};
+                const copy: Record<string, unknown> = {};
                 // only enumerable string keys
-                Object.keys(collection).forEach(k => {
-                    copy[k] = utils.cloneDeep(collection[k]);
+                Object.keys(collection as Record<string, unknown>).forEach(k => {
+                    copy[k] = utils.cloneDeep((collection as Record<string, unknown>)[k]);
                 });
                 return copy;
             }
@@ -114,65 +112,98 @@ const utils = {
 
     // iterates over elements of an array, executing the callback for each
     // element.
-    each(array, callback, thisArg) {
-        const len = array.length;
+    each: (
+        arr: unknown[],
+        callback: (item: unknown, index: number, array: unknown[]) => boolean | void,
+        thisArg?: unknown
+    ): void => {
+        const len = arr.length;
         let index = -1;
         while (++index < len) {
-            if (callback.apply(thisArg, [array[index], index, array]) === false) return;
+            if (callback.apply(thisArg, [arr[index], index, arr]) === false) return;
         }
     },
 
-    eachRight(array, callback, thisArg) {
-        let index = array.length;
+    eachRight: (
+        arr: unknown[],
+        callback: (item: unknown, index: number, array: unknown[]) => boolean | void,
+        thisArg?: unknown
+    ): void => {
+        let index = arr.length;
         while (index--) {
-            if (callback.apply(thisArg, [array[index], index, array]) === false) return;
+            if (callback.apply(thisArg, [arr[index], index, arr]) === false) return;
         }
     },
 
-    eachProp(object, callback, thisArg) {
-        const keys = Object.keys(object);
+    eachProp: (
+        obj: Record<string, unknown>,
+        callback: (value: unknown, key: string, object: Record<string, unknown>) => boolean | void,
+        thisArg?: unknown
+    ): void => {
+        const keys = Object.keys(obj);
         let index = -1;
         while (++index < keys.length) {
             const key = keys[index];
-            if (callback.apply(thisArg, [object[key], key, object]) === false) return;
+            if (callback.apply(thisArg, [obj[key], key, obj]) === false) return;
         }
     },
 
-    eachItem(collection, callback, thisArg, reverseIfArray = false) {
-        if (utils.type(collection) === 'array') {
+    eachItem: (
+        coll: unknown[] | Record<string, unknown>,
+        callback: (
+            value: unknown,
+            keyOrIndex: string | number,
+            collection: unknown[] | Record<string, unknown>
+        ) => boolean | void,
+        thisArg?: unknown,
+        reverseIfArray: boolean = false
+    ): void => {
+        if (utils.type(coll) === 'array') {
             // important! we should iterate with eachRight to prevent shifted
             // indexes when removing items from arrays.
+            const arrCallback = callback as (
+                item: unknown,
+                index: number,
+                array: unknown[]
+            ) => boolean | void;
+
             return reverseIfArray
-                ? utils.eachRight(collection, callback, thisArg)
-                : utils.each(collection, callback, thisArg);
+                ? utils.eachRight(coll as unknown[], arrCallback, thisArg)
+                : utils.each(coll as unknown[], arrCallback, thisArg);
         }
-        return utils.eachProp(collection, callback, thisArg);
+
+        const objCallback = callback as (
+            value: unknown,
+            key: string,
+            object: Record<string, unknown>
+        ) => boolean | void;
+
+        return utils.eachProp(coll as Record<string, unknown>, objCallback, thisArg);
     },
 
-    pregQuote(str) {
+    pregQuote: (str: string): string => {
         const re = /[.\\+*?[^\]$(){}=!<>|:-]/g;
         return String(str).replace(re, '\\$&');
     },
 
-    stringOrArrayOf(o, value) {
-        return typeof value === 'string'
-            && (o === value
-                || (utils.type(o) === 'array' && o.length === 1 && o[0] === value)
-            );
-    },
+    stringOrArrayOf: (o: unknown, value: string): boolean => typeof value === 'string'
+        && (o === value
+            || (utils.type(o) === 'array' && (o as unknown[]).length === 1 && (o as unknown[])[0] === value)
+        ),
 
-    hasSingleItemOf(arr, itemValue) {
+    // Revert back to regular function since arrow functions don't have their own 'arguments' object
+    // eslint-disable-next-line prefer-arrow/prefer-arrow-functions
+    hasSingleItemOf(arr: unknown[], itemValue?: unknown): boolean {
         return arr.length === 1
             && (arguments.length === 2 ? arr[0] === itemValue : true);
     },
 
     // remove trailing/redundant wildcards if not negated
-    removeTrailingWildcards(glob) {
+    removeTrailingWildcards: (glob: string): string =>
         // return glob.replace(/(.+?)(\.\*|\[\*\])*$/, '$1');
-        return glob.replace(NON_NEG_WILDCARD_TRAIL, '$1');
-    },
+        glob.replace(NON_NEG_WILDCARD_TRAIL, '$1'),
 
-    normalizeNote(note) {
+    normalizeNote: (note: string): string | number => {
         if (VAR.test(note)) return note;
         // check array index notation e.g. `[1]`
         let m = note.match(ARRAY_NOTE);
@@ -183,19 +214,19 @@ const utils = {
         throw new NotationError(`Invalid note: '${note}'`);
     },
 
-    joinNotes(notes) {
+    joinNotes: (notes: (string | number)[]): string => {
         const lastIndex = notes.length - 1;
-        return notes.map((current, i) => {
+        return notes.map((current: string | number, i: number) => {
             if (!current) return '';
             const next = lastIndex >= i + 1 ? notes[i + 1] : null;
             const dot = next
-                ? next[0] === '[' ? '' : '.'
+                ? String(next)[0] === '[' ? '' : '.'
                 : '';
             return current + dot;
         }).join('');
     },
 
-    getNewNotation(newNotation, notation) {
+    getNewNotation: (newNotation: string | unknown, notation?: string): string => {
         const errMsg = `Invalid new notation: '${newNotation}'`;
         // note validations (for newNotation and notation) are already made by
         // other methods in the flow.
