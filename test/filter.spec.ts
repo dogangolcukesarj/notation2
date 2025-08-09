@@ -226,11 +226,11 @@ describe('Notation#filter()', () => {
         expect((result as { c: number }).c).toEqual(3);
         expect((result as { d: object }).d).toEqual(expect.any(Object));
 
-        result = filter(['*', '!x']).value;
+        result = filter(['*', '!x']).value as { x?: unknown; c?: number; d?: object };
         // console.log('!x\t', result);
-        expect(result?.x).toBeUndefined();
-        expect(result?.c).toEqual(3);
-        expect(result?.d).toEqual(expect.any(Object));
+        expect((result as { x?: unknown }).x).toBeUndefined();
+        expect((result as { c?: number }).c).toEqual(3);
+        expect((result as { d?: object }).d).toEqual(expect.any(Object));
 
         result = filter(['*']).value;
         // expect(JSON.stringify(result)).toEqual(JSON.stringify(data));
@@ -242,24 +242,28 @@ describe('Notation#filter()', () => {
 
         // console.log(JSON.stringify(data, null, '  '));
 
-        result = filter(['*', '!*.*.*']).value;
+        result = filter(['*', '!*.*.*']).value as {
+            x?: { y?: object; a?: object };
+            c?: number;
+            d?: { e?: object };
+        };
         // console.log('!*.*.*\n', JSON.stringify(result, null, '  '));
-        expect(result?.x).toEqual(expect.any(Object));
-        expect(result?.x?.y).toEqual(expect.any(Object));
-        expect(Object.keys(result?.x?.y ?? {}).length).toEqual(0);
-        expect(result?.x?.a).toEqual(expect.any(Object));
-        expect(Object.keys(result?.x?.a ?? {}).length).toEqual(0);
-        expect(result?.d?.e).toEqual(expect.any(Object));
-        expect(Object.keys(result?.d?.e ?? {}).length).toEqual(0);
-        expect(result?.c).toEqual(3);
+        expect((result as { x?: { y?: object; a?: object } }).x).toEqual(expect.any(Object));
+        expect((result as { x?: { y?: object } }).x?.y).toEqual(expect.any(Object));
+        expect(Object.keys((result as { x?: { y?: object } }).x?.y ?? {}).length).toEqual(0);
+        expect((result as { x?: { a?: object } }).x?.a).toEqual(expect.any(Object));
+        expect(Object.keys((result as { x?: { a?: object } }).x?.a ?? {}).length).toEqual(0);
+        expect((result as { d?: { e?: object } }).d?.e).toEqual(expect.any(Object));
+        expect(Object.keys((result as { d?: { e?: object } }).d?.e ?? {}).length).toEqual(0);
+        expect((result as { c?: number }).c).toEqual(3);
 
-        result = filter(['*', '!*.*']).value;
+        result = filter(['*', '!*.*']).value as { x?: object; d?: object; c?: number };
         // console.log('!*.*\n', JSON.stringify(result, null, '  '));
-        expect(result?.x).toEqual(expect.any(Object));
-        expect(Object.keys(result?.x ?? {}).length).toEqual(0);
-        expect(result?.d).toEqual(expect.any(Object));
-        expect(Object.keys(result?.d ?? {}).length).toEqual(0);
-        expect(result?.c).toEqual(3);
+        expect((result as { x?: object }).x).toEqual(expect.any(Object));
+        expect(Object.keys((result as { x?: object }).x ?? {}).length).toEqual(0);
+        expect((result as { d?: object }).d).toEqual(expect.any(Object));
+        expect(Object.keys((result as { d?: object }).d ?? {}).length).toEqual(0);
+        expect((result as { c?: number }).c).toEqual(3);
     });
 
     test('#filter() » other', () => {
@@ -280,7 +284,11 @@ describe('Notation#filter()', () => {
         };
         const originalClone = utils.cloneDeep(data);
 
-        const filtered: unknown = notate(data).filter(globs).value;
+        const filtered = notate(data).filter(globs).value as {
+            box?: { model?: { code?: string; description?: string }; router?: unknown };
+            bValid?: object;
+            id?: string;
+        };
         expect(filtered?.box?.model).toBeDefined();
         expect(filtered?.box?.router).toBeUndefined(); // "!box"
         expect(filtered?.bValid).toEqual({}); // "!validation.*"
