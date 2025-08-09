@@ -1,8 +1,8 @@
 /* eslint no-use-before-define:0, consistent-return:0, max-statements:0, max-len:0 */
 
-import { Glob } from './notation.glob';
-import { NotationError } from './notation.error';
-import { utils } from '../utils';
+import { utils } from '../utils.js';
+import { Glob } from './notation.glob.js';
+import { NotationError } from './notation.error.js';
 
 const ERR = {
     SOURCE: 'Invalid source. Expected a data object or array.',
@@ -399,7 +399,7 @@ class Notation {
         const lastNote = notes[notes.length - 1];
         const lastNoteNormalized = utils.normalizeNote(lastNote);
 
-        let result, value;
+        let result; let value;
         if (utils.hasOwn(parent, lastNoteNormalized)) {
             value = parent[lastNoteNormalized];
             result = {
@@ -538,7 +538,7 @@ class Notation {
         if (!notation.trim()) throw new NotationError(ERR.NOTATION + `'${notation}'`);
         if (mode === true) mode = 'overwrite';
         let level = this._source;
-        let currentIsLast, nCurrentNote, nNextNote, nextIsArrayNote, type;
+        let currentIsLast; let nCurrentNote; let nNextNote; let nextIsArrayNote; let type;
         const insertErrMsg = 'Cannot set value by inserting at index, on an object';
 
         Notation.eachNote(notation, (levelNotation, note, index, list) => {
@@ -742,7 +742,7 @@ class Notation {
             // console.log('globNotation', globNotation);
             const g = new Glob(globNotation);
             const { glob, absGlob, isNegated, levels } = g;
-            let normalized, emptyValue, eType;
+            let normalized; let emptyValue; let eType;
             // check whether the glob ends with `.*` or `[*]` then remove
             // trailing glob note and decide for empty value (if negated). for
             // non-negated, trailing wildcards are already removed by
@@ -1417,7 +1417,7 @@ Notation.utils = utils;
  *  @param {Collection} [topSource]  Storage for initial/main collection.
  *  @returns {void}
  */
-function _each(collection, callback, reverseIfArray = false, byLevel = false, parentNotation = null, topSource = null) { // eslint-disable-line max-params
+function _each(collection, callback, reverseIfArray = false, byLevel = false, parentNotation = null, topSource = null) {
     const source = topSource || collection;
     // if (!utils.isCollection(collection)) throw ... // no need
     utils.eachItem(collection, (value, keyOrIndex) => {

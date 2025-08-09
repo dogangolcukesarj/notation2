@@ -1,5 +1,5 @@
 
-import { NotationError } from './core/notation.error';
+import { NotationError } from './core/notation.error.js';
 
 const objProto = Object.prototype;
 const symValueOf = typeof Symbol === 'function'

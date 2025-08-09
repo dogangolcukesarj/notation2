@@ -1,6 +1,6 @@
 /* eslint camelcase:0, max-lines-per-function:0, consistent-return:0, max-statements:0, max-lines:0, max-len:0 */
 
-import { Notation } from '../src/core/notation';
+import { Notation } from '../src/core/notation.js';
 
 // shuffle array
 function shuffle(o) { // v1.0

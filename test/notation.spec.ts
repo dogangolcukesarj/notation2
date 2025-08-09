@@ -2,8 +2,8 @@
 
 import * as _ from 'lodash';
 
-import { Notation } from '../src/core/notation';
-import { NotationError } from '../src/core/notation.error';
+import { Notation } from '../src/core/notation.js';
+import { NotationError } from '../src/core/notation.error.js';
 
 const o = {
     name: 'onur',

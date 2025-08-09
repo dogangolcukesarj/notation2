@@ -1,8 +1,8 @@
 /* eslint no-use-before-define:0, consistent-return:0, max-statements:0 */
 
-import { Notation } from './notation';
-import { NotationError } from './notation.error';
-import { utils } from '../utils';
+import { utils } from '../utils.js';
+import { Notation } from './notation.js';
+import { NotationError } from './notation.error.js';
 
 // http://www.linfo.org/wildcard.html
 // http://en.wikipedia.org/wiki/Glob_%28programming%29
@@ -432,7 +432,7 @@ class Glob {
 
         const len = Math.max(notesA.length, notesB.length);
         let notesI = [];
-        let a, b;
+        let a; let b;
         //   x.*  ∩  *.y   »  x.y
         // x.*.*  ∩  *.y   »  x.y.*
         // x.*.z  ∩  *.y   »  x.y.z
@@ -911,7 +911,6 @@ class Glob {
                 }
 
             });
-
 
             const keep = a.isNegated
                 ? (!posCoversNeg || negCoversNeg)

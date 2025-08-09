@@ -1,8 +1,8 @@
 /* eslint camelcase:0, max-lines-per-function:0, consistent-return:0, max-statements:0, max-lines:0, max-len:0 */
 
 import * as _ from 'lodash';
-import { Notation } from '../src/core/notation';
-import { utils } from '../src/utils';
+import { Notation } from '../src/core/notation.js';
+import { utils } from '../src/utils.js';
 
 const notate = Notation.create;
 

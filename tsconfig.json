@@ -1,0 +1,16 @@
+{
+    "extends": "@esarj/tsconfig",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "lib",
+        "typeRoots": [
+            "node_modules/@types",
+            "node_modules"
+        ]
+    },
+    "include": [
+        // tsconfig.build.json only includes src/ dir.
+        "src/**/*.ts",
+        "test/**/*.ts"
+    ]
+}

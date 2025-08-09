@@ -1,6 +1,6 @@
 /* eslint camelcase:0, consistent-return:0, max-lines-per-function:0 */
 
-import { Notation } from '../src/core/notation';
+import { Notation } from '../src/core/notation.js';
 const notate = Notation.create;
 const { union } = Notation.Glob;
 

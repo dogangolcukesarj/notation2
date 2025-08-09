@@ -1,6 +1,6 @@
 /* eslint camelcase:0, consistent-return:0, max-lines-per-function:0 */
 
-import { utils } from '../src/utils';
+import { utils } from '../src/utils.js';
 
 describe('utils', () => {
 

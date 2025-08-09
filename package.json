@@ -1,5 +1,5 @@
 {
-  "name": "notation",
+  "name": "notation2",
   "version": "2.0.0",
   "description": "Utility for modifying / processing the contents of Javascript objects or arrays via object notation strings or globs.",
   "repository": "onury/notation",
@@ -8,30 +8,32 @@
     "name": "Onur Yıldırım",
     "email": "onur@cutepilot.com"
   },
-  "main": "lib/notation.min.js",
+  "main": "lib/index.js",
+  "type": "module",
+  "types": "lib/index",
   "files": [
     "lib",
     "LICENSE"
   ],
+  "engines": {
+    "node": ">=22",
+    "npm": "^10.9.2"
+  },
+  "esarj": {
+    "type": "module",
+    "devDependencies": {
+      "eslint-config": "*",
+      "tsconfig": "*"
+    }
+  },
   "scripts": {
-    "lint": "eslint ./src",
-    "snyk": "snyk test",
-    "prebuild": "npm run snyk && npm run lint",
-    "build:dev": "webpack --mode=development --env.WEBPACK_OUT=development --progress --colors",
-    "build:prod": "webpack --mode=production --env.WEBPACK_OUT=production --progress --colors",
-    "build": "npm run build:prod && npm run build:dev",
-    "watch": "webpack --env.WEBPACK_OUT=nomin --progress --colors --watch",
-    "pretest": "npm run lint",
+    "clean": "rimraf ./lib",
+    "lint": "eslint --ext .ts src",
+    "lint:fix": "npm run lint -- --fix",
+    "build": "npm run lint && npm run clean && tsc",
     "test": "jest --testPathPattern='test/.+$' --verbose --no-cache --runInBand",
     "cover": "jest --testPathPattern='test/.+$' --verbose --no-cache --runInBand --coverage",
-    "docs": "docma",
-    "docs:serve": "docma && docma serve",
-    "release": "npm run build && npm test && npm run docs"
-  },
-  "babel": {
-    "presets": [
-      "@babel/preset-env"
-    ]
+    "release": "npm run build && npm test"
   },
   "jest": {
     "testEnvironment": "node",
@@ -92,19 +94,19 @@
     "build"
   ],
   "devDependencies": {
-    "@babel/core": "^7.11.6",
-    "@babel/preset-env": "^7.11.5",
-    "babel-eslint": "^10.1.0",
-    "babel-jest": "^26.3.0",
-    "babel-loader": "^8.1.0",
-    "babel-plugin-istanbul": "^6.0.0",
-    "eslint": "^7.8.1",
-    "jest-cli": "^26.4.2",
-    "lodash": "^4.17.20",
-    "snyk": "^1.388.0",
-    "uglifyjs-webpack-plugin": "^2.2.0",
-    "webpack": "^4.44.1",
-    "webpack-cli": "^3.3.12"
-  },
-  "dependencies": {}
+    "@esarj/eslint-config": "github:esarj/eslint-config#feature/node-22-migration",
+    "@esarj/tsconfig": "github:esarj/tsconfig#feature/node-22-migration",
+    "@types/jest": "^30.0.0",
+    "@types/lodash": "^4.17.20",
+    "@types/node": "^24.2.1",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.33.0",
+    "jest": "^30.0.5",
+    "jest-cli": "^30.0.5",
+    "lodash": "^4.17.21",
+    "rimraf": "^6.0.1",
+    "ts-jest": "^29.4.1",
+    "typescript": "^5.9.2"
+  }
 }
