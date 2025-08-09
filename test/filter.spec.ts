@@ -42,7 +42,6 @@ const o = {
     }
 };
 
-
 describe('Notation#filter()', () => {
 
     test('#filter()', () => {
@@ -50,7 +49,7 @@ describe('Notation#filter()', () => {
         const nota = notate(o).clone();
         // console.log('value ---:', nota.value);
         const globs = ['!company.limited', 'billing.account.credit', 'company.*', 'account.id'];
-        const filtered = nota.filter(globs).value;
+        const filtered = nota.filter(globs).value as typeof o;
         // console.log('filtered ---:', filtered);
 
         expect(filtered.company.name).toBeDefined();
@@ -68,9 +67,9 @@ describe('Notation#filter()', () => {
 
         const assets = { model: 'Onur', phone: { brand: 'Apple', model: 'iPhone' }, car: { brand: 'Ford', model: 'Mustang' } };
         const n = notate(assets);
-        const m1 = n.filter('*').value;
-        const m2 = n.filter('*.*').value;
-        const m3 = n.filter('*.*.*').value;
+        const m1 = n.filter('*').value as typeof assets;
+        const m2 = n.filter('*.*').value as typeof assets;
+        const m3 = n.filter('*.*.*').value as typeof assets;
         expect(m1.model).toBeDefined();
         expect(m1.phone.model).toBeDefined();
         expect(m2.model).toBeDefined();
@@ -91,8 +90,8 @@ describe('Notation#filter()', () => {
     test('#filter() » negated object', () => {
         const data = { name: 'Onur', phone: { brand: 'Apple', model: 'iPhone' }, car: { brand: 'Ford', model: 'Mustang' } };
         const globs = ['*', '!phone'];
-        const filtered = notate(data).filter(globs).value;
-        expect(filtered.name).toEqual(data.name);
+        const filtered = notate(data).filter(globs).value as typeof data;
+        expect((filtered as typeof data).name).toEqual(data.name);
         expect(filtered.phone).toBeUndefined();
         expect(filtered.car).toBeDefined();
         // console.log(filtered);
@@ -103,13 +102,13 @@ describe('Notation#filter()', () => {
         const data = { prop: { id: 1, x: true }, y: true };
         // we have the same glob both as negated and normal. negated should win.
         let globs = ['prop.id', '!prop.id'];
-        let filtered = notate(data).filter(globs).value;
+        let filtered = notate(data).filter(globs).value as typeof data;
         expect(filtered.prop).toBeUndefined();
         expect(filtered.y).toBeUndefined();
         // add wildcard
         globs = ['!prop.id', 'prop.id', '*'];
-        filtered = notate(data).filter(globs).value;
-        expect(filtered.prop).toEqual(jasmine.any(Object));
+        filtered = notate(data).filter(globs).value as typeof data;
+        expect(filtered.prop).toEqual(expect.any(Object));
         expect(filtered.prop.id).toBeUndefined();
         expect(filtered.prop.x).toEqual(true);
         expect(filtered.y).toEqual(data.y);
@@ -121,18 +120,18 @@ describe('Notation#filter()', () => {
         let globs = ['!id'];
         // should filter as `{}`
         let filtered = notate(data).filter(globs).value;
-        expect(filtered).toEqual(jasmine.any(Object));
+        expect(filtered).toEqual(expect.any(Object));
         expect(Object.keys(filtered).length).toEqual(0);
         // add wildcard
         globs = ['*', '!id'];
         filtered = notate(data).filter(globs).value;
-        expect(filtered.name).toEqual(data.name);
-        expect(filtered.id).toBeUndefined();
+        expect((filtered as typeof data).name).toEqual(data.name);
+        expect((filtered as typeof data).id).toBeUndefined();
         // no negated (id is duplicate in this case)
         globs = ['*', 'id'];
         filtered = notate(data).filter(globs).value;
-        expect(filtered.name).toEqual(data.name);
-        expect(filtered.id).toEqual(data.id);
+        expect((filtered as typeof data).name).toEqual(data.name);
+        expect((filtered as typeof data).id).toEqual(data.id);
     });
 
     test('#filter() » wildcards', () => {
@@ -147,52 +146,74 @@ describe('Notation#filter()', () => {
             }
         };
 
-        function filter(globs) {
-            return notate(_.cloneDeep(data)).filter(globs);
-        }
-        let result;
+        const filter = (globs: string[] | string): Notation => notate(_.cloneDeep(data)).filter(globs);
+        let result: {
+            x: { y: { z?: number }; a: { b?: number } };
+            c?: number;
+            d?: { e?: { f?: number; g?: { i?: number } } };
+        };
 
-        function check1() {
+        const check1 = (): void => {
             expect(result.x.y.z).toEqual(1);
             expect(result.x.a.b).toEqual(2);
             expect(result.c).toBeUndefined();
             expect(result.d).toBeUndefined();
-        }
+        };
 
         // these should be treated the same:
         // 'x.*.*' === 'x.*' === 'x'
 
-        result = filter(['x.*.*']).value;
+        result = filter(['x.*.*']).value as {
+            x: { y: { z?: number }; a: { b?: number } };
+            c?: number;
+            d?: { e?: { f?: number; g?: { i?: number } } };
+        };
         check1();
-        result = filter(['x.*']).value;
+        result = filter(['x.*']).value as {
+            x: { y: { z?: number }; a: { b?: number } };
+            c?: number;
+            d?: { e?: { f?: number; g?: { i?: number } } };
+        };
         check1();
-        result = filter(['x']).value;
+        result = filter(['x']).value as {
+            x: { y: { z?: number }; a: { b?: number } };
+            c?: number;
+            d?: { e?: { f?: number; g?: { i?: number } } };
+        };
         check1();
 
         // these should NOT be treated the same:
         // '!x.*.*' !== '!x.*' !== '!x'
 
-        result = filter(['*', '!x.*.*']).value;
+        result = filter(['*', '!x.*.*']).value as {
+            x: { y: { z?: number }; a: { b?: number } };
+            c?: number;
+            d?: { e?: { f?: number; g?: { i?: number } } };
+        };
         // console.log(result);
-        expect(result.x).toEqual(jasmine.any(Object));
-        expect(result.x.y).toEqual(jasmine.any(Object));
-        expect(result.x.a).toEqual(jasmine.any(Object));
+        expect(result.x).toEqual(expect.any(Object));
+        expect(result.x.y).toEqual(expect.any(Object));
+        expect(result.x.a).toEqual(expect.any(Object));
         expect(Object.keys(result.x.y).length).toEqual(0);
         expect(Object.keys(result.x.a).length).toEqual(0);
         expect(result.c).toEqual(3);
-        expect(result.d).toEqual(jasmine.any(Object));
+        expect(result.d).toEqual(expect.any(Object));
 
-        result = filter(['*', '!x.*']).value;
-        expect(result.x).toEqual(jasmine.any(Object));
+        result = filter(['*', '!x.*']).value as {
+            x: { y: { z?: number }; a: { b?: number } };
+            c?: number;
+            d?: { e?: { f?: number; g?: { i?: number } } };
+        };
+        expect(result.x).toEqual(expect.any(Object));
         expect(Object.keys(result.x).length).toEqual(0);
         expect(result.c).toEqual(3);
-        expect(result.d).toEqual(jasmine.any(Object));
+        expect(result.d).toEqual(expect.any(Object));
 
         result = filter(['*', '!x']).value;
         // console.log('!x\t', result);
         expect(result.x).toBeUndefined();
         expect(result.c).toEqual(3);
-        expect(result.d).toEqual(jasmine.any(Object));
+        expect(result.d).toEqual(expect.any(Object));
 
         result = filter(['*']).value;
         // expect(JSON.stringify(result)).toEqual(JSON.stringify(data));
@@ -206,20 +227,20 @@ describe('Notation#filter()', () => {
 
         result = filter(['*', '!*.*.*']).value;
         // console.log('!*.*.*\n', JSON.stringify(result, null, '  '));
-        expect(result.x).toEqual(jasmine.any(Object));
-        expect(result.x.y).toEqual(jasmine.any(Object));
+        expect(result.x).toEqual(expect.any(Object));
+        expect(result.x.y).toEqual(expect.any(Object));
         expect(Object.keys(result.x.y).length).toEqual(0);
-        expect(result.x.a).toEqual(jasmine.any(Object));
+        expect(result.x.a).toEqual(expect.any(Object));
         expect(Object.keys(result.x.a).length).toEqual(0);
-        expect(result.d.e).toEqual(jasmine.any(Object));
+        expect(result.d.e).toEqual(expect.any(Object));
         expect(Object.keys(result.d.e).length).toEqual(0);
         expect(result.c).toEqual(3);
 
         result = filter(['*', '!*.*']).value;
         // console.log('!*.*\n', JSON.stringify(result, null, '  '));
-        expect(result.x).toEqual(jasmine.any(Object));
+        expect(result.x).toEqual(expect.any(Object));
         expect(Object.keys(result.x).length).toEqual(0);
-        expect(result.d).toEqual(jasmine.any(Object));
+        expect(result.d).toEqual(expect.any(Object));
         expect(Object.keys(result.d).length).toEqual(0);
         expect(result.c).toEqual(3);
     });
@@ -390,7 +411,7 @@ describe('Notation#filter()', () => {
         expect(filtered).toEqual(expected);
         filtered = notate(obj).filter('*["x"]').value;
         expect(filtered).toEqual(expected);
-        filtered = notate(obj).filter("*['x']").value;
+        filtered = notate(obj).filter('*[\'x\']').value;
         expect(filtered).toEqual(expected);
 
         obj = { 'x.y': { z: 1 }, 'x': { y: { z: 2 } } };
